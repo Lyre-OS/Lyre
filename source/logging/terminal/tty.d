@@ -21,6 +21,14 @@ private immutable palette = [
 private immutable background = 0x2c2c2c;
 private immutable foreground = 0xdcdcdc;
 
+void objMove(T)(T* dest, T* src, ulong size) {
+    for (ulong curr = size; curr != 0; curr--) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+}
+
 struct TTY {
     private immutable uint rows;
     private immutable uint columns;
@@ -86,7 +94,9 @@ struct TTY {
     void clear() {
         currentRow    = 0;
         currentColumn = 0;
-        framebuffer.clear(background);
+        for (ulong i = 0; i < framebuffer.pitch*framebuffer.height; i++) {
+            framebuffer.address[i] = background;
+        }
         foreach (i; 0..getArraySize(grid)) {
             grid[i] = GridElem(' ', foreground);
         }
@@ -97,30 +107,29 @@ struct TTY {
         grid[index] = GridElem(c, colour);
 
         auto character = getFontCharacter(c);
-        auto fbIndexX  = column * fontWidth;
-        auto fbIndexY  = row * fontHeight;
+        const auto fbIndexX = column * fontWidth;
+        const auto fbIndexY = row * fontHeight;
+        Colour* px = framebuffer.address + fbIndexY * framebuffer.pitch + fbIndexX;
 
         foreach (int y; 0..fontHeight) {
-            int asd = fontWidth;
-            foreach (int x; 0..fontWidth) {
-                auto output = btInt(character[y], --asd) ? colour : background;
-                framebuffer.putPixel(x + fbIndexX, y + fbIndexY, output);
+            for (int x = fontWidth-1; x >= 0; x--) {
+                *(px++) = btInt(character[y], x) ? colour : background;
             }
+            px += (framebuffer.pitch-fontWidth);
         }
     }
 
     private void scroll() {
-        foreach (row; 1..rows) {
-            foreach (col; 0..columns) {
-                auto index = col + row * columns;
-                auto colour = grid[index].foreground;
-                print(row - 1, col, grid[index].character, colour);
-            }
-        }
+        const ulong fontLineSize = framebuffer.pitch * fontHeight, screenSize = framebuffer.pitch * framebuffer.height;
+        objMove(framebuffer.address, framebuffer.address + fontLineSize, screenSize - fontLineSize);
+        
+        for (ulong dest = 0; dest < framebuffer.pitch * fontHeight; dest++)
+            framebuffer.address[(framebuffer.height - fontHeight) * framebuffer.pitch + dest] = background;
 
-        foreach (col; 0..columns) {
-            print(rows - 1, col, ' ', foreground);
-        }
+        objMove(grid, grid + columns, columns);
+
+        for (ulong dest = 0; dest < columns; dest++)
+            grid[(rows - 1) * columns + dest] = GridElem(' ', foreground);
     }
 
     ~this() {

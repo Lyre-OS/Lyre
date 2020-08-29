@@ -7,10 +7,10 @@ import lib.alloc;
 alias Colour = uint;
 
 struct Framebuffer {
-    private Colour* address;
-    private size_t  width;
-    private size_t  height;
-    private size_t  pitch;
+    Colour* address;
+    size_t  width;
+    size_t  height;
+    size_t  pitch;
 
     this(StivaleFramebuffer fb) {
         this.address = cast(Colour*)(fb.address + MEM_PHYS_OFFSET);
@@ -26,13 +26,5 @@ struct Framebuffer {
     void putPixel(size_t x, size_t y, Colour c) {
         auto position = x + this.pitch * y;
         this.address[position] = c;
-    }
-
-    void clear(Colour c) {
-        foreach (y; 0..this.height) {
-            foreach (x; 0..this.width) {
-                this.putPixel(x, y, c);
-            }
-        }
     }
 }
