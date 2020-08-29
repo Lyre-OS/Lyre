@@ -10,37 +10,55 @@ private immutable colorMagenta = "\033[35m";
 private immutable colorRed     = "\033[31m";
 private immutable colorReset   = "\033[0m";
 
-enum KMessagePriority {
-    Log,
-    Warn,
-    Error
-}
 
-public void debugPrint(KMessagePriority prio, string msg) {
-        final switch (prio) {
-            case KMessagePriority.Log:
-                printMessage(colorCyan);
-                break;
-            case KMessagePriority.Warn:
-                printMessage(colorMagenta);
-                break;
-            case KMessagePriority.Error:
-                printMessage(colorRed);
-                break;
-        }
 
-        printMessage(">> ");
-        printMessage(colorReset);
-        printMessage(msg);
-        printMessage("\n");
-}
-
-public void printMessage(string msg) {
-    foreach (c; msg) {
-        // Qemu.
-        outb(0xe9, c);
+struct KMessage {
+    public enum Priority {
+        Log,
+        Warn,
+        Error
     }
 
-    // Terminal.
-	terminalPrint(msg);
+    private struct Sink {
+        void function(string msg) write;
+        Priority minPrio;
+    }
+
+    public void debugPrint(Priority prio, string msg) {
+        string color;
+        final switch (prio) {
+            case Priority.Log:
+                color = colorCyan;
+                break;
+            case Priority.Warn:
+                color = colorMagenta;
+                break;
+            case Priority.Error:
+                color = colorRed;
+                break;
+        }
+        foreach (sink; sinks[0..firstFreeSink]) {
+            if (prio >= sink.minPrio) {
+                sink.write(color);
+                sink.write(">> ");
+                if (prio <= Priority.Log) sink.write(colorReset); // If not a logging message, color all the message
+                sink.write(msg);
+                sink.write(colorReset);
+                sink.write("\n");
+            }
+        }
+    }
+
+
+    public bool addLogSink(Priority minPrio, void function(string msg) write) {
+        if (firstFreeSink > numSinks) return false;
+        sinks[firstFreeSink].minPrio = minPrio;
+        sinks[firstFreeSink].write = write;
+        firstFreeSink++;
+        return true;
+    }
+
+    private immutable numSinks = 8;
+    private Sink[numSinks] sinks;
+    private uint firstFreeSink = 0; // sinks are contiguous, use swap-and-pop to remove one
 }

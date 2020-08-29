@@ -44,7 +44,16 @@ bool streq(char* str1, char* str2) {
     return true;
 }
 
+void e9Print(string msg) {
+    foreach (c; msg) {
+        outb(0xe9, c);
+    }
+}
+
 extern (C) void main(Stivale* stivale) {
+    addLogSink("Port 0xE9", KMessage.Priority.Log, &e9Print);
+    addLogSink("Terminal", KMessage.Priority.Log, &terminalPrint);
+
     log("Hai~ <3. Doing some preparatives");
     stivale = cast(Stivale*)(cast(size_t)stivale + MEM_PHYS_OFFSET);
 

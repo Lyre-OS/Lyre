@@ -9,27 +9,28 @@ import lib.string;
 private immutable CONVERSION_TABLE = "0123456789abcdef";
 private __gshared size_t    bufferIndex;
 private __gshared char[256] buffer;
+private __gshared KMessage kmsg;
 
 void log(T...)(T form) {
     format(form);
-    sync(KMessagePriority.Log);
+    sync(KMessage.Priority.Log);
 }
 
 void warn(T...)(T form) {
     format(form);
-    sync(KMessagePriority.Warn);
+    sync(KMessage.Priority.Warn);
 }
 
 void error(T...)(T form) {
     format(form);
-    sync(KMessagePriority.Error);
+    sync(KMessage.Priority.Error);
 }
 
 void panic(T...)(T form) {
     addToBuffer("Panic: ");
     format(form);
     addToBuffer("\nThe system will now proceed to die");
-    sync(KMessagePriority.Error);
+    sync(KMessage.Priority.Error);
 
     while (true) {
         asm {
@@ -38,6 +39,14 @@ void panic(T...)(T form) {
         }
     }
 }
+
+void addLogSink(string name, KMessage.Priority minPrio, void function(string msg) write) {
+    log("messages: Added sink \"", name, "\"");
+    if (kmsg.addLogSink(minPrio, write) == false) {
+        warn("messages: No sinks left");
+    }
+}
+
 
 private void format(T...)(T items) {
     foreach (i; items) {
@@ -84,19 +93,9 @@ private void addToBuffer(size_t x) {
     addToBuffer(fromCString(&buf[i]));
 }
 
-private void sync(KMessagePriority priority) {
+private void sync(KMessage.Priority priority) {
     buffer[bufferIndex] = '\0';
     bufferIndex = 0;
 
-    debugPrint(priority, fromCString(buffer.ptr));
-
-    print(fromCString(buffer.ptr));
-    print("\n");
-}
-
-private void print(string str) {
-    terminalPrint(str);
-    foreach (c; str) {
-        outb(0xe9, c);
-    }
+    kmsg.debugPrint(priority, fromCString(buffer.ptr));
 }
