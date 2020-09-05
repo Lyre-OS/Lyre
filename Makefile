@@ -5,6 +5,8 @@ CMAGENTA  := $(shell tput setaf 5)
 CRESET    := $(shell tput sgr0)
 SOURCEDIR := source
 BUILDDIR  := build
+LIMINEURL := https://github.com/limine-bootloader/limine.git
+LIMINEDIR := limine
 
 # Compilers, several programs and their flags.
 DC   = ldc2
@@ -48,17 +50,18 @@ ${KERNEL}: ${OBJ}
 
 hdd: ${IMAGE}
 
-${IMAGE}: qloader2 ${KERNEL}
+${IMAGE}: ${LIMINEDIR} ${KERNEL}
 	@dd if=/dev/zero bs=1M count=0 seek=64 of=${IMAGE}
 	@parted -s ${IMAGE} mklabel msdos
 	@parted -s ${IMAGE} mkpart primary 1 100%
 	@echfs-utils -m -p0 ${IMAGE} quick-format 32768
 	@echfs-utils -m -p0 ${IMAGE} import ${KERNEL} ${KERNEL}
-	@echfs-utils -m -p0 ${IMAGE} import ${BUILDDIR}/qloader2.cfg qloader2.cfg
-	@qloader2/qloader2-install qloader2/qloader2.bin ${IMAGE}
+	@echfs-utils -m -p0 ${IMAGE} import ${BUILDDIR}/limine.cfg limine.cfg
+	@$(MAKE) -C limine
+	@${LIMINEDIR}/limine-install ${IMAGE}
 
-qloader2:
-	@git clone https://github.com/qword-os/qloader2.git
+${LIMINEDIR}:
+	@git clone ${LIMINEURL} ${LIMINEDIR} --depth=1 --branch=v0.4
 
 test: hdd
 	@${QEMU} ${QEMUHARDFLAGS} -hda ${IMAGE}
@@ -67,4 +70,4 @@ clean:
 	@rm -rf ${OBJ} ${KERNEL} ${IMAGE}
 
 distclean: clean
-	@rm -rf qloader2
+	@rm -rf ${LIMINEDIR}

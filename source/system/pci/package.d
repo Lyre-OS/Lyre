@@ -9,7 +9,7 @@ public import system.pci.pci;
 
 private __gshared List!(PCIDevice)* devices;
 
-void initPci() {
+void initPCI() {
     devices = scanPCI();
     printPCI(devices);
 }

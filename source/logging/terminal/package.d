@@ -13,7 +13,7 @@ struct TerminalMessage {
 private __gshared bool isInit;
 private __gshared TTY* tty;
 
-void terminalEarlyInit(StivaleFramebuffer fb) {
+void terminalInit(StivaleFramebuffer fb) {
     tty = newObj!TTY(fb);
     tty.clear();
     isInit = true;

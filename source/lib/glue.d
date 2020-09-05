@@ -3,6 +3,11 @@ module lib.glue;
 import lib.string;
 import lib.messages;
 
+// The glue in this block is a non-issue for newer releases of DMD.
+// The miss-generation of exception handlers on the frontend when betterC is
+// passed was tackled in DMD v2.093.0
+// However older versions won't work without this stubs. They should be removed
+// once the newer versions become the norm (which at debian's pace its never).
 extern (C) __gshared void* _Dmodule_ref;
 
 extern (C) void _Unwind_Resume(void *p) {
@@ -12,6 +17,7 @@ extern (C) void _Unwind_Resume(void *p) {
 extern (C) void _d_eh_personality() {
     panic("_d_eh_personality called");
 }
+// End of ditto.
 
 extern (C) void __assert(const char* exp, const char* file, uint line) {
     panic("Assertion failed in '", fromCString(file), "' line ", line);
