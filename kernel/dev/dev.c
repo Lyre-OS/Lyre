@@ -5,6 +5,7 @@
 #include <fs/devtmpfs.h>
 #include <lib/lock.h>
 #include <dev/drm/drm.h>
+#include <sys/pci.h>
 
 static dev_t device_id_counter = 1;
 
@@ -23,5 +24,8 @@ bool dev_add_new(struct resource *device, const char *dev_name) {
 bool dev_init(struct stivale2_struct_tag_framebuffer *framebuffer_tag) {
     e9_init();
     init_drm(framebuffer_tag);
+    pci_init();
+
+    while (1) {}
     return true;
 }

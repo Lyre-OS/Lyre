@@ -5,6 +5,7 @@
 #include <lib/types.h>
 #include <lib/resource.h>
 #include <stivale/stivale2.h>
+#include <lib/builtins.h>
 
 // The following functions were taken from mlibc
 
@@ -30,5 +31,21 @@ dev_t dev_new_id(void);
 bool dev_add_new(struct resource *device, const char *dev_name);
 
 bool dev_init(struct stivale2_struct_tag_framebuffer *framebuffer_tag);
+
+#define DRIVER_PCI 1
+
+struct driver {
+    int driver_type;
+};
+
+extern symbol drivers_start;
+extern symbol drivers_end;
+
+#define FOR_DRIVER_TYPE(k, type, body) for (size_t i = 0; i < ((uintptr_t)drivers_end - (uintptr_t)drivers_start); i += sizeof(uintptr_t)) {\
+    type* driver = *((type**)((uintptr_t)drivers_start + i));\
+    if (driver->driver_type == k) {\
+        body;\
+    }\
+}\
 
 #endif

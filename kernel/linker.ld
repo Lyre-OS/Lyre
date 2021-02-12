@@ -21,6 +21,12 @@ SECTIONS {
         *(.data*)
     }
 
+    .drivers : ALIGN(4K) {
+        drivers_start = .;
+        *(.drivers*)
+        drivers_end = .;
+    }
+
     .bss : ALIGN(4K) {
         *(.bss*)
         *(COMMON)
