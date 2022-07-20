@@ -25,7 +25,7 @@
 
 #define ASSERT(COND) do { \
     if (!(COND)) { \
-        panic(NULL, "Assertion failed: " ##COND); \
+        panic(NULL, "Assertion failed: " #COND); \
     } \
 } while (0)
 

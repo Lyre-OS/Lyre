@@ -5,6 +5,7 @@
 #include <lib/print.h>
 #include <mm/pmm.h>
 #include <mm/slab.h>
+#include <mm/vmm.h>
 #include <sys/gdt.h>
 #include <sys/idt.h>
 #include <sys/smp.h>
@@ -42,6 +43,7 @@ void _start(void) {
     slab_init();
     smp_init();
     sched_init();
+    vmm_init();
 
     print("Hello, %s!\n", "world");
 

@@ -10,7 +10,7 @@
 #include <mm/pmm.h>
 #include <mm/vmm.h>
 
-static volatile struct limine_memmap_request memmap_request = {
+volatile struct limine_memmap_request memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST,
     .revision = 0
 };
@@ -112,6 +112,15 @@ static void *inner_alloc(size_t pages, uint64_t limit) {
 }
 
 void *pmm_alloc(size_t pages) {
+    void *ret = pmm_alloc_nozero(pages);
+    if (ret != NULL) {
+        memset(ret + VMM_HIGHER_HALF, 0, PAGE_SIZE);
+    }
+
+    return ret;
+}
+
+void *pmm_alloc_nozero(size_t pages) {
     spinlock_acquire(&lock);
 
     size_t last = last_used_index;
