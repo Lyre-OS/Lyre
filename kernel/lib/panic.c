@@ -27,17 +27,17 @@ noreturn void panic(struct cpu_ctx *ctx, const char *fmt, ...) {
     }
 
     print("CPU context at panic:\n");
-    print("  RAX=%lx  RBX=%lx\n"
-          "  RCX=%lx  RDX=%lx\n"
-          "  RSI=%lx  RDI=%lx\n"
-          "  RBP=%lx  RSP=%lx\n"
-          "  R08=%lx  R09=%lx\n"
-          "  R10=%lx  R11=%lx\n"
-          "  R12=%lx  R13=%lx\n"
-          "  R14=%lx  R15=%lx\n"
-          "  RIP=%lx  RFLAGS=%lx\n"
-          "  CS=%lx DS=%lx ES=%lx SS=%lx\n"
-          "  ERR=%lx",
+    print("  RAX=%016lx  RBX=%016lx\n"
+          "  RCX=%016lx  RDX=%016lx\n"
+          "  RSI=%016lx  RDI=%016lx\n"
+          "  RBP=%016lx  RSP=%016lx\n"
+          "  R08=%016lx  R09=%016lx\n"
+          "  R10=%016lx  R11=%016lx\n"
+          "  R12=%016lx  R13=%016lx\n"
+          "  R14=%016lx  R15=%016lx\n"
+          "  RIP=%016lx  RFLAGS=%08lx\n"
+          "  CS=%04lx DS=%04lx ES=%04lx SS=%04lx\n"
+          "  ERR=%016lx",
           ctx->rax, ctx->rbx, ctx->rcx, ctx->rdx,
           ctx->rsi, ctx->rdi, ctx->rbp, ctx->rsp,
           ctx->r8, ctx->r9, ctx->r10, ctx->r11,
