@@ -12,10 +12,6 @@
 #define PIT_CMD_MODE1 2
 #define PIT_CMD_MODE2 4
 
-void pit_init(void) {
-    pit_set_timer(0x100);
-}
-
 uint16_t pit_get_count(void) {
     uint16_t cnt = 0;
     outb(PIT_CR, 0x00);

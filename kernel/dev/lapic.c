@@ -44,7 +44,7 @@ static void lapic_handler(void) {
 
 // Enable for all cores
 void lapic_init(void) {
-    pit_init();
+    pit_set_timer(0x100);
 
     lapic_base = (void *)((uintptr_t)rdmsr(0x1b) & 0xfffff000);
 
@@ -58,7 +58,8 @@ void lapic_init(void) {
     isr[timer_vec] = &lapic_handler;
     lapic_write(LAPIC_REG_LVT_TIMER, lapic_read(LAPIC_REG_LVT_TIMER) | (1 << 8) | timer_vec);
 
-    print("lapic: Initialized, base=%lx, timer=%i, spurious irq=%i, cmci irq=%i\n", lapic_base, timer_vec, spurious_vec, cmci_vec);
+    print("lapic: Initialized, base=%lx, timer=%i, spurious irq=%i\n",
+        lapic_base, timer_vec, spurious_vec);
 }
 
 void lapic_eoi(void) {
@@ -94,9 +95,7 @@ void lapic_timer_calibrate(void) {
     int init_tick = pit_get_count();
     int samples = 0xfffff;
     lapic_write(LAPIC_REG_TIMER_INITCNT, (uint32_t)samples);
-    while (lapic_read(LAPIC_REG_TIMER_CURCNT) != 0) {
-        asm volatile ("pause");
-    }
+    while (lapic_read(LAPIC_REG_TIMER_CURCNT) != 0);
     int final_tick = pit_get_count();
     int total_ticks = init_tick - final_tick;
     lapic_freq = (samples / total_ticks) * PIT_SCALE;
