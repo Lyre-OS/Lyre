@@ -1,8 +1,5 @@
 #include <stdint.h>
-#include <stddef.h>
 #include <dev/pit.h>
-#include <lib/print.h>
-#include <sys/cpu.h>
 #include <sys/port.h>
 
 uint16_t pit_get_current_count(void) {
