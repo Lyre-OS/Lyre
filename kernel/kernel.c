@@ -37,6 +37,8 @@ void _start(void) {
     except_init();
     pmm_init();
     slab_init();
+    smp_init();
+    lapic_init();
 
     print("Hello, %s!\n", "world");
 
