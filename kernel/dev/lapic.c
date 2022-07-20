@@ -16,7 +16,6 @@
 #define LAPIC_REG_TIMER_CURCNT 0x390 // Current count register
 #define LAPIC_REG_TIMER_DIV 0x3e0
 #define LAPIC_EOI_ACK 0x00
-#define LAPIC_ICR_SEND_PENDING (1 << 12)
 
 static void *lapic_base;
 static uint8_t spurious_vec;
@@ -45,8 +44,6 @@ static void lapic_handler(void) {
 
 // Enable for all cores
 void lapic_init(void) {
-    pit_set_timer(0x100);
-
     lapic_base = (void *)((uintptr_t)rdmsr(0x1b) & 0xfffff000);
 
     // Configure spurious IRQ
@@ -79,10 +76,6 @@ void lapic_timer_oneshot(uint32_t us, uint32_t vec) {
 void lapic_send_ipi(uint32_t lapic_id, uint32_t vec) {
     lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
     lapic_write(LAPIC_REG_ICR0, vec);
-    // Wait for it to be sent
-    while ((lapic_read(LAPIC_REG_ICR0) & LAPIC_ICR_SEND_PENDING) != 0) {
-        asm volatile ("pause");
-    }
 }
 
 void lapic_timer_calibrate(void) {
@@ -91,14 +84,14 @@ void lapic_timer_calibrate(void) {
     // Initialize PIT
     lapic_write(LAPIC_REG_LVT_TIMER, (1 << 16) | 0xff);
     lapic_write(LAPIC_REG_TIMER_DIV, 0);
-    pit_set_count(0xffff); // Reset PIT
+    pit_set_reload_value(0xffff); // Reset PIT
 
-    int init_tick = pit_get_count();
+    int init_tick = pit_get_current_count();
     int samples = 0xfffff;
     lapic_write(LAPIC_REG_TIMER_INITCNT, (uint32_t)samples);
     while (lapic_read(LAPIC_REG_TIMER_CURCNT) != 0);
-    int final_tick = pit_get_count();
+    int final_tick = pit_get_current_count();
     int total_ticks = init_tick - final_tick;
-    lapic_freq = (samples / total_ticks) * PIT_SCALE;
+    lapic_freq = (samples / total_ticks) * PIT_DIVIDEND;
     lapic_timer_stop();
 }

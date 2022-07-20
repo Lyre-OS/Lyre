@@ -5,31 +5,23 @@
 #include <sys/cpu.h>
 #include <sys/port.h>
 
-#define PIT_CHANNEL0 0x40
-#define PIT_CHANNEL1 0x41
-#define PIT_CR 0x43
-
-#define PIT_CMD_MODE0 0
-#define PIT_CMD_MODE1 2
-#define PIT_CMD_MODE2 4
-
-uint16_t pit_get_count(void) {
-    uint16_t cnt = 0;
-    outb(PIT_CR, 0x00);
-    cnt = inb(PIT_CHANNEL0);
-    cnt |= inb(PIT_CHANNEL0) << 8;
-    return cnt;
+uint16_t pit_get_current_count(void) {
+    outb(0x43, 0x00);
+    uint8_t lo = inb(0x40);
+    uint8_t hi = inb(0x40) << 8;
+    return ((uint16_t)hi << 8) | lo;
 }
 
-void pit_set_count(uint16_t cnt) {
-    outb(PIT_CHANNEL0, cnt & 0xff);
-    outb(PIT_CHANNEL0, (cnt >> 8) & 0xff);
+void pit_set_reload_value(uint16_t new_count) {
+    outb(0x43, 0x34);
+    outb(0x40, (uint8_t)new_count);
+    outb(0x40, (uint8_t)(new_count >> 8));
 }
 
-void pit_set_timer(int hz) {
-    print("pit: Setting hz=%i\n", hz);
-    int div = PIT_SCALE / hz;
-    outb(PIT_CR, 0x36);
-    outb(PIT_CHANNEL0, div & 0xff);
-    outb(PIT_CHANNEL1, (div >> 8) & 0xff);
+void pit_set_frequency(uint64_t frequency) {
+    uint64_t new_divisor = PIT_DIVIDEND / frequency;
+    if (PIT_DIVIDEND % frequency > frequency / 2) {
+        new_divisor++;
+    }
+    pit_set_reload_value((uint16_t)new_divisor);
 }

@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-#define PIT_SCALE 1193180
+#define PIT_DIVIDEND 1193180
 
-uint16_t pit_get_count(void);
-void pit_set_count(uint16_t cnt);
-void pit_set_timer(int hz);
+uint16_t pit_get_current_count(void);
+void pit_set_reload_value(uint16_t new_count);
+void pit_set_frequency(uint64_t frequency);
 
 #endif
