@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "sched.h": "c",
-        "cstdint": "cpp"
-    }
-}
