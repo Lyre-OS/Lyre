@@ -9,7 +9,8 @@
 #define LAPIC_REG_EOI 0x0b0 // End of interrupt
 #define LAPIC_REG_SPURIOUS 0x0f0
 #define LAPIC_REG_CMCI 0x2f0 // LVT Corrected machine check interrupt
-#define LAPIC_REG_ICR(X) ((0x300 + ((X) * 0x10))) // Interrupt command register
+#define LAPIC_REG_ICR0 0x300 // Interrupt command register
+#define LAPIC_REG_ICR1 0x310
 #define LAPIC_REG_LVT_TIMER 0x320
 #define LAPIC_REG_TIMER_INITCNT 0x380 // Initial count register
 #define LAPIC_REG_TIMER_CURCNT 0x390 // Current count register
@@ -76,10 +77,10 @@ void lapic_timer_oneshot(uint32_t us, uint32_t vec) {
 }
 
 void lapic_send_ipi(uint32_t lapic_id, uint32_t vec) {
-    lapic_write(LAPIC_REG_ICR(1), lapic_id << 24);
-    lapic_write(LAPIC_REG_ICR(0), vec);
+    lapic_write(LAPIC_REG_ICR1, lapic_id << 24);
+    lapic_write(LAPIC_REG_ICR0, vec);
     // Wait for it to be sent
-    while ((lapic_read(LAPIC_REG_ICR(0)) & LAPIC_ICR_SEND_PENDING) != 0) {
+    while ((lapic_read(LAPIC_REG_ICR0) & LAPIC_ICR_SEND_PENDING) != 0) {
         asm volatile ("pause");
     }
 }
