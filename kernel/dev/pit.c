@@ -3,7 +3,7 @@
 #include <sys/cpu.h>
 #include <sys/port.h>
 
-#define PIT_CHANNEL(x) (0x40 + (x))
+#define PIT_CHANNEL(X) (0x40 + (X))
 #define PIT_CR 0x43
 
 #define PIT_CMD_MODE0 0
@@ -24,7 +24,7 @@ void pit_init(void) {
     pit_set_timer(0x100);
 }
 
-int pit_get_count(void) {
+uint16_t pit_get_count(void) {
     uint16_t cnt = 0;
     cli();
     outb(PIT_CR, 0x00);
@@ -35,7 +35,7 @@ int pit_get_count(void) {
     return cnt;
 }
 
-void pit_set_count(int cnt) {
+void pit_set_count(uint16_t cnt) {
     cli();
     outb(PIT_CHANNEL(0), cnt & 0xff);
     outb(PIT_CHANNEL(0), (cnt >> 8) & 0xff);
