@@ -10,8 +10,6 @@
 #define PIT_CMD_MODE1 2
 #define PIT_CMD_MODE2 4
 
-#define PIT_SCALE 1193180
-
 void pit_init(void) {
     outb(0x20, 0x11);
     outb(0xa0, 0x11);

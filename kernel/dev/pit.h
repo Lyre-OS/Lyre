@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define PIT_SCALE 1193180
+
 void pit_init(void);
 uint16_t pit_get_count(void);
 void pit_set_count(uint16_t cnt);
