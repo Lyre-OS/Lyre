@@ -52,7 +52,4 @@ static inline uint64_t wrmsr(uint32_t msr, uint64_t val) {
     return ((uint64_t)edx << 32) | eax;
 }
 
-#define cli() asm ("cli")
-#define sti() asm ("sti")
-
 #endif

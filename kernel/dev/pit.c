@@ -26,20 +26,20 @@ void pit_init(void) {
 
 uint16_t pit_get_count(void) {
     uint16_t cnt = 0;
-    cli();
+    asm ("cli");
     outb(PIT_CR, 0x00);
 
     cnt = inb(PIT_CHANNEL(0));
     cnt |= inb(PIT_CHANNEL(0)) << 8;
-    sti();
+    asm ("sti");
     return cnt;
 }
 
 void pit_set_count(uint16_t cnt) {
-    cli();
+    asm ("cli");
     outb(PIT_CHANNEL(0), cnt & 0xff);
     outb(PIT_CHANNEL(0), (cnt >> 8) & 0xff);
-    sti();
+    asm ("sti");
 }
 
 void pit_set_timer(int hz) {
