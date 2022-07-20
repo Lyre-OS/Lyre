@@ -8,9 +8,7 @@
 #include <mm/vmm.h>
 #include <sys/gdt.h>
 #include <sys/idt.h>
-#include <sys/smp.h>
 #include <sys/except.h>
-#include <sys/sched.h>
 #include <limine.h>
 
 // The Limine requests can be placed anywhere, but it is important that
@@ -41,8 +39,6 @@ void _start(void) {
     except_init();
     pmm_init();
     slab_init();
-    smp_init();
-    sched_init();
     vmm_init();
 
     print("Hello, %s!\n", "world");

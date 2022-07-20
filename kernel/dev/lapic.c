@@ -34,6 +34,8 @@ static void lapic_handler(void) {
 
 // Enable for all cores
 void lapic_init(void) {
+    pit_init();
+
     lapic_base = (void *)((uintptr_t)rdmsr(0x1b) & 0xfffff000);
 
     // Configure spurious IRQ

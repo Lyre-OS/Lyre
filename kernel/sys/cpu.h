@@ -53,11 +53,11 @@ static inline uint64_t wrmsr(uint32_t msr, uint64_t val) {
 }
 
 static inline void cli(void) {
-    asm volatile ("cli" : : : "cc");
+    asm volatile ("cli");
 }
 
 static inline void sti(void) {
-    asm volatile ("sti" : : : "cc");
+    asm volatile ("sti");
 }
 
 #endif
