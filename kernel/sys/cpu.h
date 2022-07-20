@@ -37,7 +37,7 @@ static inline uint64_t rdmsr(uint32_t msr) {
         : "c" (msr)
         : "memory"
     );
-    return (edx << 32) | eax;
+    return ((uint64_t)edx << 32) | eax;
 }
 
 static inline uint64_t wrmsr(uint32_t msr, uint64_t val) {
@@ -49,7 +49,7 @@ static inline uint64_t wrmsr(uint32_t msr, uint64_t val) {
         : "a" (eax), "d" (edx), "c" (msr)
         : "memory"
     );
-    return (edx << 32) | eax;
+    return ((uint64_t)edx << 32) | eax;
 }
 
 #endif
