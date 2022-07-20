@@ -8,6 +8,7 @@ sysroot
 iso_root
 lyre.iso
 initramfs.tar
+.vscode/
 
 *.elf
 *.bin
