@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <mm/slab.h>
 
+#define ALLOC(TYPE) (alloc(sizeof(TYPE)))
+
 static inline void *alloc(size_t size) {
     return slab_alloc(size);
 }

@@ -1,6 +1,8 @@
 #ifndef _LIB__MISC_H
 #define _LIB__MISC_H
 
+#include <lib/panic.h>
+
 #define DIV_ROUNDUP(VALUE, DIV) ({ \
     typeof(VALUE) DIV_ROUNDUP_value = VALUE; \
     typeof(DIV) DIV_ROUNDUP_div = DIV; \
@@ -20,6 +22,18 @@
 })
 
 #define SIZEOF_ARRAY(ARRAY) (sizeof(ARRAY) / sizeof(ARRAY[0]))
+
+#define ASSERT(COND) do { \
+    if (!(COND)) { \
+        panic(NULL, "Assertion failed: " ##COND); \
+    } \
+} while (0)
+
+#define ASSERT_MSG(COND, ...) do { \
+    if (!(COND)) { \
+        panic(NULL, __VA_ARGS__); \
+    } \
+} while (0)
 
 typedef char symbol[];
 

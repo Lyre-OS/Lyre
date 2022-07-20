@@ -9,6 +9,7 @@
 #include <sys/idt.h>
 #include <sys/smp.h>
 #include <sys/except.h>
+#include <sys/sched.h>
 #include <limine.h>
 
 // The Limine requests can be placed anywhere, but it is important that
@@ -40,7 +41,7 @@ void _start(void) {
     pmm_init();
     slab_init();
     smp_init();
-    lapic_init();
+    sched_init();
 
     print("Hello, %s!\n", "world");
 

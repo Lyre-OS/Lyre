@@ -52,4 +52,12 @@ static inline uint64_t wrmsr(uint32_t msr, uint64_t val) {
     return ((uint64_t)edx << 32) | eax;
 }
 
+static inline void cli(void) {
+    asm volatile ("cli" : : : "cc");
+}
+
+static inline void sti(void) {
+    asm volatile ("sti" : : : "cc");
+}
+
 #endif

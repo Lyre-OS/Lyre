@@ -16,12 +16,14 @@ void smp_init(void) {
     }
 
     print("smp: %u cores\n", (unsigned int)response->cpu_count);
+    lapic_init();
     for (size_t i = 0; i < response->cpu_count; i++) {
         struct limine_smp_info *cpu = response->cpus[i];
 
         if (cpu->lapic_id != response->bsp_lapic_id) {
-            lapic_send_ipi(cpu->lapic_id, 0x500);
-            lapic_send_ipi(cpu->lapic_id, 0x600);
+            lapic_send_ipi(0, LAPIC_ICR_INIT | (0x03 << 18));
+            lapic_send_ipi(0, LAPIC_ICR_STARTUP | (0x03 << 18));
         }
+        print("cpu: #%u lapic_id=%u\n", (unsigned int)i, (unsigned int)cpu->lapic_id);
     }
 }
