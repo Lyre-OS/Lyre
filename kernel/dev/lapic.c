@@ -16,16 +16,16 @@
 #define LAPIC_LOGICAL_DEST 0x0d0
 #define LAPIC_DEST_FORMAT 0x0e0
 #define LAPIC_SPURIOUS 0x0f0
-#define LAPIC_ISR(x) ((0x100 + (x * 0x10))) // In-service register 
-#define LAPIC_TMR(x) ((0x180 + (x * 0x10))) // Trigger mode register
-#define LAPIC_IRR(x) ((0x200 + (x * 0x10))) // Interrupt request register
+#define LAPIC_ISR(X) ((0x100 + ((X) * 0x10))) // In-service register 
+#define LAPIC_TMR(X) ((0x180 + ((X) * 0x10))) // Trigger mode register
+#define LAPIC_IRR(X) ((0x200 + ((X) * 0x10))) // Interrupt request register
 #define LAPIC_ERROR 0x280 // Error status
 #define LAPIC_CMCI 0x2f0 // LVT Corrected machine check interrupt
-#define LAPIC_ICR(x) ((0x300 + (x * 0x10))) // Interrupt command register
+#define LAPIC_ICR(X) ((0x300 + ((X) * 0x10))) // Interrupt command register
 #define LAPIC_LVT_TIMER 0x320
 #define LAPIC_LVT_THERMAL 0x330
 #define LAPIC_LVT_PERFORMANCE 0x340
-#define LAPIC_LVT_LINT(x) (0x350 + (x * 0x10))
+#define LAPIC_LVT_LINT(X) (0x350 + ((X) * 0x10))
 #define LAPIC_LVT_ERROR_REG 0x370
 #define LAPIC_TIMER_INITCNT 0x380 // Initial count register
 #define LAPIC_TIMER_CURCNT 0x390 // Current count register
@@ -127,13 +127,15 @@ void lapic_timer_calibrate(void) {
     lapic_write(LAPIC_TIMER_DIV, 0);
     pit_set_count(0xffff); // Reset PIT
 
-    unsigned int init_tick = pit_get_count();
+    int init_tick = pit_get_count();
     int samples = 0xfffff;
     lapic_write(LAPIC_TIMER_INITCNT, (uint32_t)samples);
-    while (lapic_read(LAPIC_TIMER_CURCNT) != 0);
-    unsigned int final_tick = pit_get_count();
+    while (lapic_read(LAPIC_TIMER_CURCNT) != 0) {
+        asm volatile ("pause");
+    }
+    int final_tick = pit_get_count();
 
-    unsigned int total_ticks = init_tick - final_tick;
+    int total_ticks = init_tick - final_tick;
     lapic_freq = (samples / total_ticks) * PIT_SCALE;
     lapic_timer_stop();
 }

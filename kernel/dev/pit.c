@@ -24,7 +24,7 @@ void pit_init(void) {
     pit_set_timer(0x100);
 }
 
-uint16_t pit_get_count(void) {
+int pit_get_count(void) {
     uint16_t cnt = 0;
     cli();
     outb(PIT_CR, 0x00);
@@ -35,7 +35,7 @@ uint16_t pit_get_count(void) {
     return cnt;
 }
 
-void pit_set_count(uint16_t cnt) {
+void pit_set_count(int cnt) {
     cli();
     outb(PIT_CHANNEL(0), cnt & 0xff);
     outb(PIT_CHANNEL(0), (cnt >> 8) & 0xff);

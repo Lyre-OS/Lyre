@@ -6,8 +6,8 @@
 #define PIT_SCALE 1193180
 
 void pit_init(void);
-uint16_t pit_get_count(void);
-void pit_set_count(uint16_t cnt);
+int pit_get_count(void);
+void pit_set_count(int cnt);
 void pit_set_timer(int hz);
 
 #endif
