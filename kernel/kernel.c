@@ -1,11 +1,13 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <dev/char/serial.h>
+#include <dev/lapic.h>
 #include <lib/print.h>
 #include <mm/pmm.h>
 #include <mm/slab.h>
 #include <sys/gdt.h>
 #include <sys/idt.h>
+#include <sys/smp.h>
 #include <sys/except.h>
 #include <limine.h>
 
