@@ -6,6 +6,10 @@
 #include <lib/misc.h>
 #include <lib/print.h>
 
+#define PCI_MAX_FUNCTION 8
+#define PCI_MAX_DEVICE 32
+#define PCI_MAX_BUS 256
+
 pci_device_list_t pci_devices = VECTOR_INIT;
 
 static inline void pci_check_bus(uint8_t bus, struct pci_device *parent);
@@ -28,8 +32,7 @@ static inline void pci_device_write(struct pci_device *dev, uint32_t offset,
     outd(0xcfc, value);
 }
 
-static inline bool pci_device_is_bar_present(struct pci_device *dev,
-                                             uint8_t bar) {
+bool pci_device_is_bar_present(struct pci_device *dev, uint8_t bar) {
     ASSERT(bar <= 5);
     uint8_t reg_index = 0x10 + bar * 4;
     return pci_device_read(dev, reg_index) != 0;

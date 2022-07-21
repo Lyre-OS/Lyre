@@ -4,10 +4,6 @@
 #include <stddef.h>
 #include <lib/vector.h>
 
-#define PCI_MAX_FUNCTION 8
-#define PCI_MAX_DEVICE 32
-#define PCI_MAX_BUS 256
-
 struct pci_device {
     uint8_t bus;
     uint8_t slot;
@@ -37,8 +33,9 @@ struct pci_bar {
 };
 
 typedef VECTOR_TYPE(struct pci_device *) pci_device_list_t;
-
 extern pci_device_list_t pci_devices;
+
+bool pci_device_is_bar_present(struct pci_device *dev, uint8_t bar);
 struct pci_bar pci_device_get_bar(struct pci_device *dev, uint8_t bar);
 void pci_initialise(void);
 
