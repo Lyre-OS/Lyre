@@ -23,7 +23,7 @@ static inline void outw(uint16_t port, uint16_t value) {
 
 static inline void outd(uint16_t port, uint32_t value) {
     asm volatile (
-        "outd %0, %1\n\t"
+        "outl %0, %1\n\t"
         :
         : "a" (value), "Nd" (port)
         : "memory"
@@ -55,7 +55,7 @@ static inline uint16_t inw(uint16_t port) {
 static inline uint32_t ind(uint16_t port) {
     uint32_t value;
     asm volatile (
-        "ind %1, %0\n\t"
+        "inl %1, %0\n\t"
         : "=a" (value)
         : "Nd" (port)
         : "memory"
