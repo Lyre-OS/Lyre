@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <dev/char/serial.h>
+#include <dev/bus/pci.h>
 #include <dev/lapic.h>
 #include <lib/print.h>
 #include <mm/pmm.h>
