@@ -38,6 +38,6 @@ extern pci_device_list_t pci_devices;
 
 bool pci_device_is_bar_present(struct pci_device *dev, uint8_t bar);
 struct pci_bar pci_device_get_bar(struct pci_device *dev, uint8_t bar);
-void pci_initialise(void);
+void pci_init(void);
 
 #endif
