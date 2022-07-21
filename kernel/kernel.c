@@ -10,6 +10,7 @@
 #include <sys/gdt.h>
 #include <sys/idt.h>
 #include <sys/except.h>
+#include <fs/vfs/vfs.h>
 #include <limine.h>
 
 // The Limine requests can be placed anywhere, but it is important that
@@ -42,6 +43,7 @@ void _start(void) {
     slab_init();
     vmm_init();
     pci_init();
+    vfs_init();
 
     print("Hello, %s!\n", "world");
 

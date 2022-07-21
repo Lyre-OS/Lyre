@@ -9,7 +9,7 @@ struct resource {
     size_t actual_size;
     size_t refcount;
     spinlock_t lock;
-    struct stat st;
+    struct stat stat;
 };
 
 #endif
