@@ -56,7 +56,7 @@ struct pci_bar pci_device_get_bar(struct pci_device *dev, uint8_t bar) {
     pci_device_write(dev, reg_index, bar_size_low);
 
     uint32_t bar_size_high = 0xffffffff;
-    if(is_64_bits) {
+    if (is_64_bits) {
         pci_device_write(dev, reg_index + 4, 0xffffffff);
         bar_size_high = pci_device_read(dev, reg_index + 4);
         pci_device_write(dev, reg_index + 4, bar_high);
