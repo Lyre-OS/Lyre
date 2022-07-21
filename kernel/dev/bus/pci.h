@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdatomic.h>
+#include <stdbool.h>
 #include <lib/vector.h>
 
 struct pci_device {
