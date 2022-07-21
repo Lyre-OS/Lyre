@@ -1,4 +1,5 @@
 #ifndef _DEV__BUS__PCI_H
+#define _DEV__BUS__PCI_H
 
 #include <stdint.h>
 #include <stddef.h>
