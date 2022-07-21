@@ -15,7 +15,7 @@ pci_device_list_t pci_devices = VECTOR_INIT;
 static inline void pci_check_bus(uint8_t bus, struct pci_device *parent);
 
 static inline void pci_device_get_address(struct pci_device *dev, uint32_t offset) {
-    uint32_t address = ((uint32_t)dev->bus << 16);
+    uint32_t address = (uint32_t)dev->bus << 16;
     address |= (uint32_t)dev->slot << 11;
     address |= (uint32_t)dev->func << 8;
     address |= offset & (~3);
@@ -78,12 +78,11 @@ static inline void pci_device_read_info(struct pci_device *dev) {
     dev->subclass = (uint8_t)(pci_device_read(dev, 0x08) >> 16);
     dev->class = (uint8_t)(pci_device_read(dev, 0x08) >> 24);
     dev->prog_if = (uint8_t)(pci_device_read(dev, 0x08) >> 8);
-    dev->multifunction = ((pci_device_read(dev, 0x0c) & 0x800000) != 0);
+    dev->multifunction = (pci_device_read(dev, 0x0c) & 0x800000) != 0;
     dev->irq_pin = (uint8_t)(pci_device_read(dev, 0x3c) >> 8);
 }
 
-static inline void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func,
-                                    struct pci_device *parent) {
+static inline void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func, struct pci_device *parent) {
     struct pci_device device = {0};
     device.bus = bus;
     device.slot = slot;
@@ -101,12 +100,12 @@ static inline void pci_check_func(uint8_t bus, uint8_t slot, uint8_t func,
         struct pci_device *save_device = ALLOC(struct pci_device);
         VECTOR_PUSH_BACK(pci_devices, save_device);
 
-        print("pci: Found device %04x:%04x bus=%u,slot=%u,func=%u\n",
+        print("pci: Found device %04x:%04x bus=%u, slot=%u, func=%u\n",
             device.vendor_id, device.device_id, bus, slot, func);
         for (uint8_t bar = 0; bar < 6; bar++) {
             if (pci_device_is_bar_present(&device, bar)) {
                 struct pci_bar bar_info = pci_device_get_bar(&device, bar);
-                print("pci: \tbar#%u base=%08x,size=%x\n", bar, bar_info.base, bar_info.size);
+                print("pci: \tbar#%u base=%08x, size=%x\n", bar, bar_info.base, bar_info.size);
             }
         }
     }
