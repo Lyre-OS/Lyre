@@ -40,6 +40,7 @@ void _start(void) {
     pmm_init();
     slab_init();
     vmm_init();
+    pci_initialise();
 
     print("Hello, %s!\n", "world");
 
