@@ -1,4 +1,4 @@
-QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom lyre.iso -serial stdio
+QEMUFLAGS ?= -M q35,smm=off -m 8G -boot order=dc -cdrom lyre.iso -serial stdio -drive file=test.hdd,if=none,index=1,id=nvm -device nvme,serial=deadbeef,drive=nvm  -trace nvme_* -trace pci_nvme_*
 
 .PHONY: all
 all: jinx
