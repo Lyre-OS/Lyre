@@ -4,6 +4,8 @@
 *.elf
 *.hdd
 *.iso
+/symtab.map
+/compile_commands.json
 /limine.h
 /cross-detect
 /cross-files

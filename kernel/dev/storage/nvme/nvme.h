@@ -4,7 +4,7 @@
 #include <lib/lock.h>
 #include <stdint.h>
 
-typedef struct {
+struct nvme_powerstate {
     uint16_t maxpower;
     uint8_t unused1;
     uint8_t flags;
@@ -20,10 +20,10 @@ typedef struct {
     uint16_t power;
     uint8_t workscale;
     uint8_t unused3[9];
-} nvme_powerstate_t;
+};
 
 // capabilities for the nvme controller
-typedef struct {
+struct nvme_id {
     uint16_t vid;
     uint16_t ssvid;
     char sn[20];
@@ -64,17 +64,17 @@ typedef struct {
     uint16_t unused5;
     uint32_t sgls;
     uint32_t unused6[377];
-    nvme_powerstate_t powerstate[32];
+    struct nvme_powerstate powerstate[32];
     uint8_t vs[1024];
-} nvme_id_t;
+};
 
-typedef struct {
+struct nvme_lbaf {
     uint16_t ms;
     uint8_t ds;
     uint8_t rp;
-} nvme_lbaf_t;
+};
 
-typedef struct {
+struct nvme_nsid {
     uint64_t size;
     uint64_t capabilities;
     uint64_t nuse;
@@ -99,10 +99,10 @@ typedef struct {
     uint64_t unusued3[5];
     uint8_t nguid[16];
     uint8_t eui64[8];
-    nvme_lbaf_t lbaf[16];
+    struct nvme_lbaf lbaf[16];
     uint64_t unused3[24];
     uint8_t vs[3712];
-} nvme_nsid_t;
+};
 
 #define NVME_OPFLUSH 0x00
 #define NVME_OPWRITE 0x01
@@ -131,7 +131,7 @@ typedef struct {
 
 // each command is 512 bytes, so we need to use a union along with reserving unused data portions
 // somewhat complete NVMe command set
-typedef struct {
+struct nvme_cmd {
     union {
         struct { uint8_t opcode; uint8_t flags; uint16_t cid; uint32_t nsid; uint32_t cdw1[2]; uint64_t metadata; uint64_t prp1; uint64_t prp2; uint32_t cdw2[6]; } common; // generic command
         struct { uint8_t opcode; uint8_t flags; uint16_t cid; uint32_t nsid; uint64_t unused; uint64_t metadata; uint64_t prp1; uint64_t prp2; uint64_t slba; uint16_t len; uint16_t control; uint32_t dsmgmt; uint32_t ref; uint16_t apptag; uint16_t appmask; } rw; // read or write
@@ -142,20 +142,20 @@ typedef struct {
         struct { uint8_t opcode; uint8_t flags; uint16_t cid; uint32_t unused1[9]; uint16_t qid; uint16_t unused2; uint32_t unused3[5]; } deleteq;
         struct { uint8_t opcode; uint8_t flags; uint16_t cid; uint32_t unused1[9]; uint16_t sqid; uint16_t cqid; uint32_t unused2[5]; } abort;
     };
-} nvme_cmd_t;
+};
 
 // command result
-typedef struct {
+struct nvme_cmdcomp {
     uint32_t res;
     uint32_t unused;
     uint16_t sqhead;
     uint16_t sqid;
     uint16_t cid;
     uint16_t status;
-} nvme_cmdcomp_t;
+};
 
 // according to BAR0 registers (osdev wiki)
-typedef struct {
+struct nvme_bar {
     uint64_t capabilities; // 0x00-0x07
     uint32_t version; // 0x08-0x0B
     uint32_t intms; // 0x0C-0x0F (interrupt mask set)
@@ -167,7 +167,7 @@ typedef struct {
     uint32_t aqa; // 0x24-0x27 (admin queue attrs)
     uint64_t asq; // 0x28-0x2F (admin submit queue)
     uint64_t acq; // 0x30-0x37 (admin completion queue)
-} nvme_bar_t;
+};
 
 #define NVME_CAPMQES(cap)      ((cap) & 0xffff)
 #define NVME_CAPTIMEOUT(cap)   (((cap) >> 24) & 0xff)
@@ -175,9 +175,9 @@ typedef struct {
 #define NVME_CAPMPSMIN(cap)    (((cap) >> 48) & 0xf)
 #define NVME_CAPMPSMAX(cap)    (((cap) >> 52) & 0xf)
 
-typedef struct {
-    volatile nvme_cmd_t *submit;
-    volatile nvme_cmdcomp_t *completion;
+struct nvme_queue {
+    volatile struct nvme_cmd *submit;
+    volatile struct nvme_cmdcomp *completion;
     volatile uint32_t *submitdb;  
     volatile uint32_t *completedb;
     uint16_t elements; // elements in queue
@@ -189,35 +189,22 @@ typedef struct {
     uint16_t qid; // queue id
     uint32_t cmdid; // command id
     uint64_t *physregpgs; // pointer to the PRPs
-} nvme_queue_t;
+};
 
 #define NVME_WAITCACHE 0 // cache is not ready
 #define NVME_READYCACHE 1 // cache is ready
 #define NVME_DIRTYCACHE 2 // cache is damaged/dirty
 
+// TODO: Globalise for drivers
 // cache (helps speed up disk read/writes)
-typedef struct {
+struct cachedblock {
     uint8_t *cache; // pointer to the cache we have for this block
     uint64_t block;
     uint64_t end;
     int status;
-} nvme_cachedblock_t;
+};
 
-typedef struct {
-    volatile nvme_bar_t *bar;
-    uint64_t stride;
-    uint64_t queueslots;
-    nvme_queue_t queue[2];
-    uint64_t lbasize;
-    uint64_t lbacount;
-    int maxphysrpgs; // maximum number of PRPs (Physical Region Pages)
-    uint64_t overwritten;
-    nvme_cachedblock_t *cache;
-    uint64_t cacheblocksize;
-    uint64_t maxtransshift;
-} nvme_device_t;
-
-void nvme_submitcmd(nvme_queue_t *queue, nvme_cmd_t cmd);
-uint16_t nvme_awaitsubmitcmd(nvme_queue_t *queue, nvme_cmd_t cmd);
+void nvme_submitcmd(struct nvme_queue *queue, struct nvme_cmd cmd);
+uint16_t nvme_awaitsubmitcmd(struct nvme_queue *queue, struct nvme_cmd cmd);
 
 #endif
