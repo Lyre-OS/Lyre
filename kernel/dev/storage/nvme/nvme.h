@@ -4,24 +4,6 @@
 #include <lib/lock.h>
 #include <stdint.h>
 
-struct nvme_powerstate {
-    uint16_t maxpower;
-    uint8_t unused1;
-    uint8_t flags;
-    uint32_t entrylat; // entry latency
-    uint32_t exitlat; // exit latency
-    uint8_t readtput;
-    uint8_t readlat; // read latency
-    uint8_t writetput;
-    uint8_t writelat; // write latency
-    uint16_t idlepower;
-    uint8_t idlescale;
-    uint8_t unused2;
-    uint16_t power;
-    uint8_t workscale;
-    uint8_t unused3[9];
-};
-
 // capabilities for the nvme controller
 struct nvme_id {
     uint16_t vid;
@@ -63,8 +45,7 @@ struct nvme_id {
     uint16_t acwu;
     uint16_t unused5;
     uint32_t sgls;
-    uint32_t unused6[377];
-    struct nvme_powerstate powerstate[32];
+    uint32_t unused6[1401];
     uint8_t vs[1024];
 };
 
@@ -104,30 +85,18 @@ struct nvme_nsid {
     uint8_t vs[3712];
 };
 
+// generic
 #define NVME_OPFLUSH 0x00
 #define NVME_OPWRITE 0x01
 #define NVME_OPREAD 0x02
-#define NVME_OPWRITEU 0x03
-#define NVME_OPCMP 0x05
-#define NVME_OPWZ 0x08
-#define NVME_OPDSM 0x09
-#define NVME_OPRESVREG 0x0d
-#define NVME_OPRESVREP 0x0e
-#define NVME_OPRESVACQ 0x11
-#define NVME_OPRESVREL 0x15
-
-#define NVME_OPDELSQ 0x00
+// admin
 #define NVME_OPCREATESQ 0x01
-#define NVME_OPGETLOGPAGE 0x02
 #define NVME_OPDELCQ 0x04
 #define NVME_OPCREATECQ 0x05
 #define NVME_OPIDENTIFY 0x06
 #define NVME_OPABORT 0x08
 #define NVME_OPSETFT 0x09
 #define NVME_OPGETFT 0x0a
-#define NVME_OPASYNCEV 0x0c
-#define NVME_OPSECSEND 0x81
-#define NVME_OPSECRECV 0x82
 
 // each command is 512 bytes, so we need to use a union along with reserving unused data portions
 // somewhat complete NVMe command set
@@ -170,7 +139,6 @@ struct nvme_bar {
 };
 
 #define NVME_CAPMQES(cap)      ((cap) & 0xffff)
-#define NVME_CAPTIMEOUT(cap)   (((cap) >> 24) & 0xff)
 #define NVME_CAPSTRIDE(cap)    (((cap) >> 32) & 0xf)
 #define NVME_CAPMPSMIN(cap)    (((cap) >> 48) & 0xf)
 #define NVME_CAPMPSMAX(cap)    (((cap) >> 52) & 0xf)
@@ -196,7 +164,7 @@ struct nvme_queue {
 #define NVME_DIRTYCACHE 2 // cache is damaged/dirty
 
 // TODO: Globalise for drivers
-// cache (helps speed up disk read/writes)
+// cache (helps speed up disk reads by hitting cache)
 struct cachedblock {
     uint8_t *cache; // pointer to the cache we have for this block
     uint64_t block;
