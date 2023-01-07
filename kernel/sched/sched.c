@@ -401,7 +401,7 @@ struct thread *sched_new_user_thread(struct process *proc, void *pc, void *arg, 
 
     void *pf_stack_phys = pmm_alloc(STACK_SIZE / PAGE_SIZE);
     VECTOR_PUSH_BACK(&thread->stacks, pf_stack_phys);
-    thread->pf_stack = kernel_stack_phys + STACK_SIZE + VMM_HIGHER_HALF;
+    thread->pf_stack = pf_stack_phys + STACK_SIZE + VMM_HIGHER_HALF;
 
 #if defined (__x86_64__)
     thread->ctx.cs = 0x4b;

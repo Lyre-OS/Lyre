@@ -13,6 +13,7 @@
 #include <sys/idt.h>
 #include <sys/except.h>
 #include <sys/int_events.h>
+#include <fs/ext2fs.h>
 #include <fs/vfs/vfs.h>
 #include <limine.h>
 #include <fs/initramfs.h>
@@ -51,12 +52,15 @@ void _start(void) {
 void kmain_thread(void) {
     random_init();
     vfs_init();
+    ext2fs_init();
     tmpfs_init();
     devtmpfs_init();
     vfs_mount(vfs_root, NULL, "/", "tmpfs");
     vfs_create(vfs_root, "/dev", 0755 | S_IFDIR);
-    vfs_mount(vfs_root, NULL, "/dev", "devtmpfs");
+    vfs_mount(vfs_root, NULL, "/dev", "devtmpfs"); 
     dev_init();
+    vfs_create(vfs_root, "/mnt", 0755 | S_IFDIR);
+    vfs_mount(vfs_root, "/dev/nvme0n1", "/mnt", "ext2fs");
     initramfs_init();
 
     struct pagemap *init_vm = vmm_new_pagemap();
