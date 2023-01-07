@@ -496,7 +496,6 @@ int syscall_openat(void *_, int dir_fdnum, const char *path, int flags, int mode
     }
 
     if (!S_ISREG(node->resource->stat.st_mode) && (flags & O_TRUNC) != 0) {
-        kernel_print("here!\n");
         errno = EINVAL;
         goto cleanup;
     }
