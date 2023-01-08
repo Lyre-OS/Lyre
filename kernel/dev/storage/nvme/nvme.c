@@ -74,7 +74,9 @@ static ssize_t nvme_setqueuecount(struct nvme_device *ctrl, int count) {
     cmd.features.fid = 0x07; // number of queues (feature)
     cmd.features.dword = (count - 1) | ((count - 1) << 16);
     uint16_t status = nvme_awaitsubmitcmd(&ctrl->adminqueue, cmd);
-    if(status != 0) return -1;
+    if (status != 0) {
+        return -1;
+    }
     return 0;
 }
 
@@ -90,7 +92,9 @@ static ssize_t nvme_createqueues(struct nvme_device *ctrl, struct nvme_nsdevice 
     cmd1.createcompq.cqflags = (1 << 0); // queue phys
     cmd1.createcompq.irqvec = 0;
     uint16_t status = nvme_awaitsubmitcmd(&ctrl->adminqueue, cmd1);
-    if(status != 0) return -1;
+    if (status != 0) {
+        return -1;
+    }
 
     struct nvme_cmd cmd2 = { 0 };
     cmd2.createsubq.opcode = NVME_OPCREATESQ;
@@ -100,7 +104,9 @@ static ssize_t nvme_createqueues(struct nvme_device *ctrl, struct nvme_nsdevice 
     cmd2.createsubq.size = ctrl->queueslots - 1;
     cmd2.createsubq.sqflags = (1 << 0) | (2 << 1); // queue phys + medium priority
     status = nvme_awaitsubmitcmd(&ctrl->adminqueue, cmd2);
-    if(status != 0) return -1;
+    if (status != 0) {
+        return -1;
+    }
     return 0;
 }
 
@@ -109,7 +115,9 @@ void nvme_submitcmd(struct nvme_queue *queue, struct nvme_cmd cmd) {
     uint16_t tail = queue->sqtail; // tail of the submit queue
     queue->submit[tail] = cmd; // add to tail (end of queue)
     tail++;
-    if(tail == queue->elements) tail = 0;
+    if (tail == queue->elements) {
+        tail = 0;
+    }
     *(queue->submitdb) = tail; // set to tail
     queue->sqtail = tail; // update tail so now it'll point to the element after (nothing until we submit a new command)
 }
@@ -122,16 +130,18 @@ uint16_t nvme_awaitsubmitcmd(struct nvme_queue *queue, struct nvme_cmd cmd) {
     nvme_submitcmd(queue, cmd);
     uint16_t status = 0; 
 
-    while(true) {
+    while (true) {
         status = queue->completion[queue->cqhead].status;
-        if((status & 0x01) == phase) break;
+        if ((status & 0x01) == phase) {
+            break;
+        }
     }
 
     status >>= 1;
     ASSERT_MSG(!status, "nvme: cmd error %x", status);
 
     head++;
-    if(head == queue->elements) {
+    if (head == queue->elements) {
         head = 0;
         queue->cqphase = !queue->cqphase; // flip phase
     }
@@ -150,19 +160,25 @@ static ssize_t nvme_identify(struct nvme_device *ctrl, struct nvme_id *id) {
     cmd.identify.prp1 = (uint64_t)id - VMM_HIGHER_HALF;
     ssize_t off = (uint64_t)id & (PAGE_SIZE - 1);
     len -= (PAGE_SIZE - off);
-    if(len <= 0) cmd.identify.prp2 = 0;
-    else {
+    if (len <= 0) {
+        cmd.identify.prp2 = 0;
+    } else {
         uint64_t addr = (uint64_t)id + (PAGE_SIZE - off);
         cmd.identify.prp2 = addr;
     }
 
     uint16_t status = nvme_awaitsubmitcmd(&ctrl->adminqueue, cmd);
-    if(status != 0) return -1;
+    if (status != 0) {
+        return -1;
+    }
 
     size_t shift = 12 + NVME_CAPMPSMIN(ctrl->bar->capabilities);
     size_t maxtransshift;
-    if(id->mdts) maxtransshift = shift + id->mdts;
-    else maxtransshift = 20;
+    if (id->mdts) {
+        maxtransshift = shift + id->mdts;
+    } else {
+        maxtransshift = 20;
+    }
     ctrl->maxtransshift = maxtransshift;
     return 0;
 }
@@ -174,7 +190,9 @@ ssize_t nvme_nsid(struct nvme_nsdevice *ns, struct nvme_nsid *nsid) {
     cmd.identify.cns = 0;
     cmd.identify.prp1 = (uint64_t)nsid - VMM_HIGHER_HALF;
     uint16_t status = nvme_awaitsubmitcmd(&ns->controller->adminqueue, cmd);
-    if(status != 0) return -1;
+    if (status != 0) {
+        return -1; 
+    }
     return 0;
 }
 
@@ -184,14 +202,18 @@ static ssize_t nvme_rwlba(struct nvme_nsdevice *ns, void *buf, uint64_t start, u
     int shoulduseprp = 0;
     int shoulduseprplist = 0;
     uint32_t cid = ns->queue.cmdid;
-    if((count * ns->lbasize) > PAGE_SIZE) {
-        if((count * ns->lbasize) > (PAGE_SIZE * 2)) {
+    if ((count * ns->lbasize) > PAGE_SIZE) {
+        if ((count * ns->lbasize) > (PAGE_SIZE * 2)) {
             size_t prpcount = ((count - 1) * ns->lbasize) / PAGE_SIZE;
             ASSERT_MSG(!(prpcount > ns->maxphysrpgs), "nvme: exceeded phyiscal region pages");
-            for(size_t i = 0; i < prpcount; i++) ns->queue.physregpgs[i + cid * ns->maxphysrpgs] = ((uint64_t)(buf - VMM_HIGHER_HALF - pageoff) + PAGE_SIZE + i * PAGE_SIZE);
+            for (size_t i = 0; i < prpcount; i++) {
+                ns->queue.physregpgs[i + cid * ns->maxphysrpgs] = ((uint64_t)(buf - VMM_HIGHER_HALF - pageoff) + PAGE_SIZE + i * PAGE_SIZE);
+            }
             shoulduseprp = 0;
             shoulduseprplist = 1;
-        } shoulduseprp = 1;
+        } else {
+            shoulduseprp = 1;
+        }
     }
     struct nvme_cmd cmd = { 0 };
     cmd.rw.opcode = write ? NVME_OPWRITE : NVME_OPREAD;
@@ -205,11 +227,14 @@ static ssize_t nvme_rwlba(struct nvme_nsdevice *ns, void *buf, uint64_t start, u
     cmd.rw.metadata = 0;
     cmd.rw.slba = start;
     cmd.rw.len = count - 1;
-    if(shoulduseprplist) {
+    if (shoulduseprplist) {
         cmd.rw.prp1 = (uint64_t)buf - VMM_HIGHER_HALF;
         cmd.rw.prp2 = (uint64_t)(&ns->queue.physregpgs[cid * ns->maxphysrpgs]) - VMM_HIGHER_HALF;
-    } else if(shoulduseprp) cmd.rw.prp2 = (uint64_t)((uint64_t)buf + PAGE_SIZE - VMM_HIGHER_HALF);
-    else cmd.rw.prp1 = (uint64_t)buf - VMM_HIGHER_HALF;
+    } else if (shoulduseprp) {
+        cmd.rw.prp2 = (uint64_t)((uint64_t)buf + PAGE_SIZE - VMM_HIGHER_HALF);
+    } else {
+        cmd.rw.prp1 = (uint64_t)buf - VMM_HIGHER_HALF;
+    }
 
     uint16_t status = nvme_awaitsubmitcmd(&ns->queue, cmd);
     ASSERT_MSG(!status, "nvme: failed to read/write with status %x\n", status);
@@ -217,8 +242,10 @@ static ssize_t nvme_rwlba(struct nvme_nsdevice *ns, void *buf, uint64_t start, u
 }
 
 static ssize_t nvme_findblock(struct nvme_nsdevice *ns, uint64_t block) {
-    for(size_t i = 0; i < 512; i++) {
-        if((ns->cache[i].block == block) && (ns->cache[i].status)) return i;
+    for (size_t i = 0; i < 512; i++) {
+        if ((ns->cache[i].block == block) && (ns->cache[i].status)) {
+            return i;
+        }
     }
     return -1;
 }
@@ -227,10 +254,16 @@ static ssize_t nvme_cacheblock(struct nvme_nsdevice *ns, uint64_t block) {
     // only called with this block isn't already cached
     int ret, target;
 
-    for(target = 0; target < 512; target++) if(!ns->cache[target].status) goto found; // find a free cache block
+    for (target = 0; target < 512; target++) {
+        if (!ns->cache[target].status) {
+            goto found; // find a free cache block
+        }
+    }
 
     // overwrite an existing cache (we needn't worry about overwriting anything cache-wise as they just exist to speed up repitition of recent block reads)
-    if(ns->overwritten == 512) ns->overwritten = 0;
+    if (ns->overwritten == 512) {
+        ns->overwritten = 0;
+    }
     target = ns->overwritten++;
 
     goto notfound;
@@ -239,7 +272,9 @@ found:
     ns->cache[target].cache = alloc(ns->cacheblocksize); // intialise cache
 notfound:
     ret = nvme_rwlba(ns, ns->cache[target].cache, (ns->cacheblocksize / ns->lbasize) * block, ns->cacheblocksize / ns->lbasize, 0); // dump data from block into cache (this will be used immediately afterwards for reads (and as a basis for writes))
-    if(ret == -1) return ret;
+    if (ret == -1) {
+        return ret;
+    }
 
     ns->cache[target].block = block;
     ns->cache[target].status = NVME_READYCACHE;
@@ -248,63 +283,67 @@ notfound:
 }
 
 // read `count` bytes at `loc` into `buf`
-ssize_t nvme_read(struct resource *this_, struct f_description *description, void *buf, off_t loc, size_t count) {
+ssize_t nvme_read(struct resource *_this, struct f_description *description, void *buf, off_t loc, size_t count) {
     (void)description;
-    spinlock_acquire(&this_->lock);
+    spinlock_acquire(&_this->lock);
+    struct nvme_nsdevice *this = (struct nvme_nsdevice *)_this;
     
-    for(size_t progress = 0; progress < count;) {
-        uint64_t sector = (loc + progress) / ((struct nvme_nsdevice *)this_)->cacheblocksize;
-        int slot = nvme_findblock((struct nvme_nsdevice *)this_, sector); // find a cache associated with this block
-        if(slot == -1) {
-            slot = nvme_cacheblock((struct nvme_nsdevice *)this_, sector); // request a cache so next time we can just hit that for this block
-            if(slot == -1) {
-                spinlock_release(&this_->lock);
+    for (size_t progress = 0; progress < count;) {
+        uint64_t sector = (loc + progress) / this->cacheblocksize;
+        int slot = nvme_findblock(this, sector); // find a cache associated with this block
+        if (slot == -1) {
+            slot = nvme_cacheblock(this, sector); // request a cache so next time we can just hit that for this block
+            if (slot == -1) {
+                spinlock_release(&this->lock);
                 return -1;
             }
         }
 
         uint64_t chunk = count - progress;
-        size_t off = (loc + progress) % ((struct nvme_nsdevice *)this_)->cacheblocksize;
-        if(chunk > ((struct nvme_nsdevice *)this_)->cacheblocksize - off) chunk = ((struct nvme_nsdevice *)this_)->cacheblocksize - off;
-        memcpy(buf + progress, &((struct nvme_nsdevice *)this_)->cache[slot].cache[off], chunk); // copy data chunk into buffer
+        size_t off = (loc + progress) % this->cacheblocksize;
+        if (chunk > this->cacheblocksize - off) {
+            chunk = this->cacheblocksize - off;
+        }
+        memcpy(buf + progress, &this->cache[slot].cache[off], chunk); // copy data chunk into buffer
         progress += chunk;
     }
 
-    spinlock_release(&this_->lock);
+    spinlock_release(&this->lock);
     return count;
 }
 
-ssize_t nvme_write(struct resource *this_, struct f_description *description, const void *buf, off_t loc, size_t count) {
+ssize_t nvme_write(struct resource *_this, struct f_description *description, const void *buf, off_t loc, size_t count) {
     (void)description;
-    spinlock_acquire(&this_->lock);
+    spinlock_acquire(&_this->lock);
+    struct nvme_nsdevice *this = (struct nvme_nsdevice *)_this;
 
-    for(size_t progress = 0; progress < count;) {
-        uint64_t sector = (loc + progress) / ((struct nvme_nsdevice *)this_)->cacheblocksize;
-        int slot = nvme_findblock((struct nvme_nsdevice *)this_, sector);
-        if(slot == -1) {
-            slot = nvme_cacheblock((struct nvme_nsdevice *)this_, sector);
-            if(slot == -1) {
-                spinlock_release(&this_->lock);
+    for (size_t progress = 0; progress < count;) {
+        uint64_t sector = (loc + progress) / this->cacheblocksize;
+        int slot = nvme_findblock(this, sector);
+        if (slot == -1) {
+            slot = nvme_cacheblock(this, sector);
+            if (slot == -1) {
+                spinlock_release(&this->lock);
                 return -1;
             }
         }
 
         uint64_t chunk = count - progress;
-        size_t off = (loc + progress) % ((struct nvme_nsdevice *)this_)->cacheblocksize;
-        if(chunk > ((struct nvme_nsdevice *)this_)->cacheblocksize - off) chunk = ((struct nvme_nsdevice *)this_)->cacheblocksize - off;
+        size_t off = (loc + progress) % this->cacheblocksize;
+        if (chunk > this->cacheblocksize - off) chunk = this->cacheblocksize - off;
 
         // copy buffer into cache (for writing)
-        memcpy(&((struct nvme_nsdevice *)this_)->cache[slot].cache[off], buf + progress, chunk);
-        ((struct nvme_nsdevice *)this_)->cache[slot].status = NVME_READYCACHE; // in usage (allow for cache hits)
-        int ret = nvme_rwlba((struct nvme_nsdevice *)this_, ((struct nvme_nsdevice *)this_)->cache[slot].cache, ((struct nvme_nsdevice *)this_)->cacheblocksize / ((struct nvme_nsdevice *)this_)->lbasize * ((struct nvme_nsdevice *)this_)->cache[slot].block, ((struct nvme_nsdevice *)this_)->cacheblocksize / ((struct nvme_nsdevice *)this_)->lbasize, 1);
-        if(ret == -1) {
-            spinlock_release(&this_->lock);
+        memcpy(&this->cache[slot].cache[off], buf + progress, chunk);
+        this->cache[slot].status = NVME_READYCACHE; // in usage (allow for cache hits)
+        int ret = nvme_rwlba(this, this->cache[slot].cache, this->cacheblocksize / this->lbasize * this->cache[slot].block, this->cacheblocksize / this->lbasize, 1);
+        if (ret == -1) {
+            spinlock_release(&this->lock);
             return -1;
         }
         progress += chunk;
     }
 
-    spinlock_release(&this_->lock);
+    spinlock_release(&this->lock);
     return count;
 }
 
@@ -360,12 +399,12 @@ static void nvme_initcontroller(struct pci_device *device) {
     pci_set_privl(device, PCI_PRIV_MMIO | PCI_PRIV_BUSMASTER);
     
     uint32_t conf = controller_res->bar->conf;
-    if(conf & (1 << 0)) { // controller enabled?
+    if (conf & (1 << 0)) { // controller enabled?
         conf &= ~(1 << 0); // disable controller
         controller_res->bar->conf = conf;
     }
 
-    while(((controller_res->bar->status) & (1 << 0))); // await controller ready
+    while ((controller_res->bar->status) & (1 << 0)); // await controller ready
     
     controller_res->stride = NVME_CAPSTRIDE(controller_res->bar->capabilities);
     controller_res->queueslots = NVME_CAPMQES(controller_res->bar->capabilities); 
@@ -379,9 +418,11 @@ static void nvme_initcontroller(struct pci_device *device) {
     controller_res->bar->asq = (uint64_t)controller_res->adminqueue.submit - VMM_HIGHER_HALF;
     controller_res->bar->acq = (uint64_t)controller_res->adminqueue.completion - VMM_HIGHER_HALF;
     controller_res->bar->conf = conf;
-    while(true) {
+    while (true) {
         uint32_t status = controller_res->bar->status;
-        if(status & (1 << 0)) break; // ready
+        if (status & (1 << 0)) {
+            break; // ready
+        }
         ASSERT_MSG(!(status & (1 << 1)), "nvme: controller status is fatal");
     }
 
@@ -398,8 +439,8 @@ static void nvme_initcontroller(struct pci_device *device) {
 
 
     nvme_setqueuecount(controller_res, 4);
-    for(size_t i = 0; i < id->nn; i++) {
-        if(nsids[i] && nsids[i] < id->nn) {
+    for (size_t i = 0; i < id->nn; i++) {
+        if (nsids[i] && nsids[i] < id->nn) {
             kernel_print("nvme: found namespace %lu\n", nsids[i]);
             nvme_initnamespace(nsids[i], controller_res);
         }
@@ -418,6 +459,15 @@ static void nvme_initcontroller(struct pci_device *device) {
     nvme_devcount++; // keep track for device name purposes (officially done with this controller)
 }
 
-static struct pci_driver nvme_driver = { .name = "nvme", .match = PCI_MATCH_CLASS | PCI_MATCH_SUBCLASS | PCI_MATCH_PROG_IF, .init = nvme_initcontroller, .pci_class = 0x01, .subclass = 0x08, .prog_if = 0x02, .vendor = 0, .device = 0 };
+static struct pci_driver nvme_driver = {
+    .name = "nvme", 
+    .match = PCI_MATCH_CLASS | PCI_MATCH_SUBCLASS | PCI_MATCH_PROG_IF, 
+    .init = nvme_initcontroller, 
+    .pci_class = 0x01, 
+    .subclass = 0x08, 
+    .prog_if = 0x02, 
+    .vendor = 0, 
+    .device = 0
+};
 
 EXPORT_PCI_DRIVER(nvme_driver);
