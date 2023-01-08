@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 int main() {
-    FILE *f = fopen("/dev/nvme0p0", "r");
+    FILE *f = fopen("/dev/nvme0n1p0", "r");
     char start[7];
     fread(start, 6, 1, f);
     printf("%s\n", start);
