@@ -106,96 +106,101 @@ struct nvme_nsid {
 struct nvme_cmd {
     union {
         struct {
-            uint8_t opcode; 
-            uint8_t flags; 
-            uint16_t cid; 
-            uint32_t nsid; 
-            uint32_t cdw1[2]; 
-            uint64_t metadata; 
-            uint64_t prp1; 
-            uint64_t prp2; 
+            uint8_t opcode;
+            uint8_t flags;
+            uint16_t cid;
+            uint32_t nsid;
+            uint32_t cdw1[2];
+            uint64_t metadata;
+            uint64_t prp1;
+            uint64_t prp2;
             uint32_t cdw2[6];
         } common; // generic command
         struct {
-            uint8_t opcode; 
-            uint8_t flags; 
-            uint16_t cid; 
-            uint32_t nsid; 
+            uint8_t opcode;
+            uint8_t flags;
+            uint16_t cid;
+            uint32_t nsid;
             uint64_t unused;
-            uint64_t metadata; 
-            uint64_t prp1; 
-            uint64_t prp2; 
-            uint64_t slba; 
-            uint16_t len; 
-            uint16_t control; 
-            uint32_t dsmgmt; 
-            uint32_t ref; 
-            uint16_t apptag; 
+            uint64_t metadata;
+            uint64_t prp1;
+            uint64_t prp2;
+            uint64_t slba;
+            uint16_t len;
+            uint16_t control;
+            uint32_t dsmgmt;
+            uint32_t ref;
+            uint16_t apptag;
             uint16_t appmask;
         } rw; // read or write
         struct {
-            uint8_t opcode; 
-            uint8_t flags; 
-            uint16_t cid; 
-            uint32_t nsid; 
-            uint64_t unused1; 
-            uint64_t unused2; 
-            uint64_t prp1; 
-            uint64_t prp2; 
-            uint32_t cns; 
-            uint32_t unused3[5]; 
-        } identify; // identify
-        struct { uint8_t opcode; 
-            uint8_t flags; 
+            uint8_t opcode;
+            uint8_t flags;
             uint16_t cid;
-            uint32_t nsid; 
+            uint32_t nsid;
             uint64_t unused1;
-            uint64_t unused2; 
-            uint64_t prp1; 
-            uint64_t prp2; 
-            uint32_t fid; 
-            uint32_t dword;
-            uint64_t unused[2]; 
-        } features;
-        struct { uint8_t opcode; 
-            uint8_t flags; 
-            uint16_t cid; 
-            uint32_t unused1[5]; 
+            uint64_t unused2;
             uint64_t prp1;
-            uint64_t unused2; 
-            uint16_t cqid; 
-            uint16_t size; 
-            uint16_t cqflags; 
-            uint16_t irqvec; 
+            uint64_t prp2;
+            uint32_t cns;
+            uint32_t unused3[5];
+        } identify; // identify
+        struct {
+            uint8_t opcode;
+            uint8_t flags;
+            uint16_t cid;
+            uint32_t nsid;
+            uint64_t unused1;
+            uint64_t unused2;
+            uint64_t prp1;
+            uint64_t prp2;
+            uint32_t fid;
+            uint32_t dword;
+            uint64_t unused[2];
+        } features;
+        struct {
+            uint8_t opcode;
+            uint8_t flags;
+            uint16_t cid;
+            uint32_t unused1[5];
+            uint64_t prp1;
+            uint64_t unused2;
+            uint16_t cqid;
+            uint16_t size;
+            uint16_t cqflags;
+            uint16_t irqvec;
             uint64_t unused3[2];
         } createcompq;
-        struct { uint8_t opcode;
-            uint8_t flags; 
-            uint16_t cid; 
+        struct {
+            uint8_t opcode;
+            uint8_t flags;
+            uint16_t cid;
             uint32_t unused1[5];
-            uint64_t prp1; 
-            uint64_t unused2; 
-            uint16_t sqid; 
-            uint16_t size; 
-            uint16_t sqflags; 
-            uint16_t cqid; 
-            uint64_t unused3[2]; 
+            uint64_t prp1;
+            uint64_t unused2;
+            uint16_t sqid;
+            uint16_t size;
+            uint16_t sqflags;
+            uint16_t cqid;
+            uint64_t unused3[2];
         } createsubq;
-        struct { uint8_t opcode; 
+        struct {
+            uint8_t opcode;
             uint8_t flags;
             uint16_t cid;
             uint32_t unused1[9];
             uint16_t qid;
-            uint16_t unused2; 
-            uint32_t unused3[5]; 
+            uint16_t unused2;
+            uint32_t unused3[5];
         } deleteq;
-        struct { uint8_t opcode;
-            uint8_t flags; 
+        struct {
+            uint8_t opcode;
+            uint8_t flags;
             uint16_t cid;
             uint32_t unused1[9];
             uint16_t sqid;
-            uint16_t cqid; 
-            uint32_t unused2[5]; 
+            uint16_t cqid;
+            uint32_t unused2[5];
         } abort;
     };
 };
@@ -630,7 +635,7 @@ static void nvme_initnamespace(size_t id, struct nvme_device *controller) {
 
     char devname[32];
     snprint(devname, sizeof(devname) - 1, "nvme%lun%lu", nvme_devcount, id);
-    devtmpfs_add_device((struct resource *)nsdev_res, devname);  
+    devtmpfs_add_device((struct resource *)nsdev_res, devname);
 
     kernel_print("nvme: attempting to enumerate partitions on /dev/%s\n", devname);
     // enumerate partitions on this device
@@ -657,7 +662,7 @@ static void nvme_initcontroller(struct pci_device *device) {
     while ((controller_res->bar->status) & (1 << 0)); // await controller ready
     
     controller_res->stride = NVME_CAPSTRIDE(controller_res->bar->capabilities);
-    controller_res->queueslots = NVME_CAPMQES(controller_res->bar->capabilities); 
+    controller_res->queueslots = NVME_CAPMQES(controller_res->bar->capabilities);
     nvme_createaqueue(controller_res, &controller_res->adminqueue, controller_res->queueslots, 0); // intialise first queue
 
     uint32_t aqa = controller_res->queueslots - 1;
@@ -679,7 +684,7 @@ static void nvme_initcontroller(struct pci_device *device) {
     struct nvme_id *id = (struct nvme_id *)alloc(sizeof(struct nvme_id));
     ASSERT_MSG(!nvme_identify(controller_res, id), "nvme: failed to idenfity NVMe controller");
     
-    uint32_t *nsids = alloc(DIV_ROUNDUP(id->nn * 4, PAGE_SIZE)); 
+    uint32_t *nsids = alloc(DIV_ROUNDUP(id->nn * 4, PAGE_SIZE));
 
     struct nvme_cmd getns = { 0 };
     getns.identify.opcode = NVME_OPIDENTIFY;
@@ -711,12 +716,12 @@ static void nvme_initcontroller(struct pci_device *device) {
 
 static struct pci_driver nvme_driver = {
     .name = "nvme", 
-    .match = PCI_MATCH_CLASS | PCI_MATCH_SUBCLASS | PCI_MATCH_PROG_IF, 
-    .init = nvme_initcontroller, 
-    .pci_class = 0x01, 
-    .subclass = 0x08, 
-    .prog_if = 0x02, 
-    .vendor = 0, 
+    .match = PCI_MATCH_CLASS | PCI_MATCH_SUBCLASS | PCI_MATCH_PROG_IF,
+    .init = nvme_initcontroller,
+    .pci_class = 0x01,
+    .subclass = 0x08,
+    .prog_if = 0x02,
+    .vendor = 0,
     .device = 0
 };
 

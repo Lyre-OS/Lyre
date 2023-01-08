@@ -113,7 +113,7 @@ void partition_enum(struct resource *root, const char *rootname, uint16_t blocks
             continue; // skip this
         }
 
-        kernel_print("partition: gpt: p%u start: %u (+%u)\n", i, entry.start, entry.end - entry.start);
+        kernel_print("partition: gpt: p%u start: %u (+%u)\n", i + 1, entry.start, entry.end - entry.start);
         struct partition_device *part_res = resource_create(sizeof(struct partition_device));
         part_res->root = root;
         part_res->blksize = blocksize;
@@ -130,8 +130,8 @@ void partition_enum(struct resource *root, const char *rootname, uint16_t blocks
         part_res->read = readpart;
         part_res->ioctl = resource_default_ioctl;
         char partname[64];
-        snprint(partname, sizeof(partname) - 1, convention, rootname, i);
-        devtmpfs_add_device((struct resource *)part_res, partname); 
+        snprint(partname, sizeof(partname) - 1, convention, rootname, i + 1);
+        devtmpfs_add_device((struct resource *)part_res, partname);
     }
     return;
 mbr:
@@ -149,7 +149,7 @@ mbr:
         if (!entries[i].type) {
             continue;
         }
-        kernel_print("partition: mbr: p%u start: %u (+%u)\n", i, entries[i].startsect, entries[i].sectors);
+        kernel_print("partition: mbr: p%u start: %u (+%u)\n", i + 1, entries[i].startsect, entries[i].sectors);
 
         struct partition_device *part_res = resource_create(sizeof(struct partition_device));
         part_res->root = root;
@@ -167,7 +167,7 @@ mbr:
         part_res->read = readpart;
         part_res->ioctl = resource_default_ioctl;
         char partname[64];
-        snprint(partname, sizeof(partname) - 1, convention, rootname, i);
+        snprint(partname, sizeof(partname) - 1, convention, rootname, i + 1);
         devtmpfs_add_device((struct resource *)part_res, partname);
     }
 }

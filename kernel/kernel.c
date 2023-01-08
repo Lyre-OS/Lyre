@@ -36,7 +36,7 @@ void _start(void) {
     pmm_init();
     slab_init();
     vmm_init();
-    proc_init(); 
+    proc_init();
 
     kernel_process = sched_new_process(NULL, vmm_kernel_pagemap);
 
@@ -55,7 +55,7 @@ void kmain_thread(void) {
     devtmpfs_init();
     vfs_mount(vfs_root, NULL, "/", "tmpfs");
     vfs_create(vfs_root, "/dev", 0755 | S_IFDIR);
-    vfs_mount(vfs_root, NULL, "/dev", "devtmpfs"); 
+    vfs_mount(vfs_root, NULL, "/dev", "devtmpfs");
     dev_init();
     initramfs_init();
 

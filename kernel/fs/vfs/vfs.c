@@ -246,7 +246,7 @@ bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
             errno = EISDIR;
             goto cleanup;
         }
-    } 
+    }
 
     r = path2node(parent, target);
 
@@ -260,7 +260,7 @@ bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
         errno = EISDIR;
         goto cleanup;
     }
- 
+
     struct vfs_node *mount_node = fs->mount(r.target_parent, r.basename, source_node);
     r.target->mountpoint = mount_node;
 
