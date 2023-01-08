@@ -4,14 +4,20 @@
 #include <lib/print.h>
 
 // wrappers for partition offset read/writes
-static ssize_t readpart(struct resource *this_, struct f_description *description, void *buf, off_t loc, size_t count) {
-    if(loc >= ((struct partition_device *)this_)->sectors * ((struct partition_device *)this_)->blksize) return -1;
-    return ((struct partition_device *)this_)->root->read(((struct partition_device *)this_)->root, description, buf, loc + ((struct partition_device *)this_)->start * ((struct partition_device *)this_)->blksize, count);
+static ssize_t readpart(struct resource *_this, struct f_description *description, void *buf, off_t loc, size_t count) {
+    struct partition_device *this = (struct partition_device *)_this;
+    if ((size_t)loc >= this->sectors * this->blksize) {
+        return -1;
+    }
+    return this->root->read(this->root, description, buf, loc + this->start * this->blksize, count);
 }
 
-static ssize_t writepart(struct resource *this_, struct f_description *description, const void *buf, off_t loc, size_t count) {
-    if(loc >= ((struct partition_device *)this_)->sectors * ((struct partition_device *)this_)->blksize) return -1;
-    return ((struct partition_device *)this_)->root->write(((struct partition_device *)this_)->root, description, buf, loc + ((struct partition_device *)this_)->start * ((struct partition_device *)this_)->blksize, count);
+static ssize_t writepart(struct resource *_this, struct f_description *description, const void *buf, off_t loc, size_t count) {
+    struct partition_device *this = (struct partition_device *)_this;
+    if ((size_t)loc >= this->sectors * this->blksize) {
+        return -1;
+    }
+    return this->root->write(this->root, description, buf, loc + this->start * this->blksize, count);
 }
 
 void partition_enum(struct resource *root, const char *rootname, uint16_t blocksize, const char *convention) {
@@ -20,21 +26,35 @@ void partition_enum(struct resource *root, const char *rootname, uint16_t blocks
     root->read(root, NULL, &header, loc, sizeof(header));
     loc += sizeof(header);
 
-    if(strncmp(header.sig, "EFI PART", 8)) goto mbr; // not GPT either
-    if(header.len < 92) goto mbr; // incorrect length
-    if(header.len > root->stat.st_size) goto mbr; // segmented header
-    if(header.lba != 1) goto mbr; // should be first
-    if(header.first > header.last) goto mbr; // borked header
+    if (strncmp(header.sig, "EFI PART", 8)) {
+        goto mbr; // not GPT either
+    }
+    if (header.len < 92) {
+        goto mbr; // incorrect length
+    }
+    if (header.len > root->stat.st_size) {
+        goto mbr; // segmented header
+    }
+    if (header.lba != 1) {
+        goto mbr; // should be first
+    }
+    if (header.first > header.last) {
+        goto mbr; // borked header
+    }
 
     struct gpt_entry entry = { 0 };
     loc = header.partlba * 512;
-    for(size_t i = 0; i < header.entries; i++) {
+    for (size_t i = 0; i < header.entries; i++) {
         root->read(root, NULL, &entry, loc, sizeof(entry));
         loc += sizeof(entry);
 
-        if(entry.unilow == 0 && entry.unihi == 0) continue;
+        if (entry.unilow == 0 && entry.unihi == 0) {
+            continue;
+        }
 
-        if(entry.attr & (GPT_DONTMOUNT | GPT_LEGACY)) continue; // skip this
+        if (entry.attr & (GPT_DONTMOUNT | GPT_LEGACY)) {
+            continue; // skip this
+        }
 
         kernel_print("partition: gpt: p%u start: %u (+%u)\n", i, entry.start, entry.end - entry.start);
         struct partition_device *part_res = resource_create(sizeof(struct partition_device));
@@ -62,12 +82,16 @@ mbr:
     loc = 444;
     root->read(root, NULL, &hint, loc, 2);
     loc += 2;
-    if(hint && hint != 0x5a5a) return;
+    if (hint && hint != 0x5a5a) {
+        return;
+    }
     struct mbr_entry entries[4];
     root->read(root, NULL, entries, loc, sizeof(struct mbr_entry) * 4);
 
-    for(size_t i = 0; i < 4; i++) {
-        if(!entries[i].type) continue;
+    for (size_t i = 0; i < 4; i++) {
+        if (!entries[i].type) {
+            continue;
+        }
         kernel_print("partition: mbr: p%u start: %u (+%u)\n", i, entries[i].startsect, entries[i].sectors);
 
         struct partition_device *part_res = resource_create(sizeof(struct partition_device));
