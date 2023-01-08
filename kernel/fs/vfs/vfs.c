@@ -86,7 +86,7 @@ static struct path2node_res path2node(struct vfs_node *parent, const char *path)
         current_node = reduce_node(vfs_root, false);
         while (path[index] == '/') {
             if (index == path_len - 1) {
-                return (struct path2node_res){current_node, current_node, strdup("")};
+                return (struct path2node_res){current_node, current_node, strdup("/")};
             }
             index++;
         }
@@ -158,7 +158,9 @@ static struct vfs_node *get_parent_dir(int dir_fdnum, const char *path) {
 
     if (path != NULL && *path == '/') {
         return vfs_root;
-    } else if (dir_fdnum == AT_FDCWD) {
+    }
+
+    if (dir_fdnum == AT_FDCWD) {
         return proc->cwd;
     }
 
@@ -438,6 +440,10 @@ bool vfs_fdnum_path_to_node(int dir_fdnum, const char *path, bool empty_path, bo
 
     if (basename != NULL) {
         *basename = res.basename;
+    } else {
+        if (res.basename != NULL) {
+            free(res.basename);
+        }
     }
 
     return true;
@@ -454,7 +460,8 @@ int syscall_openat(void *_, int dir_fdnum, const char *path, int flags, int mode
     struct process *proc = thread->process;
 
     struct vfs_node *parent = NULL;
-    if (!vfs_fdnum_path_to_node(dir_fdnum, path, false, false, &parent, NULL, NULL)) {
+    char *basename = NULL;
+    if (!vfs_fdnum_path_to_node(dir_fdnum, path, false, false, &parent, NULL, &basename)) {
         goto cleanup;
     }
 
@@ -466,10 +473,10 @@ int syscall_openat(void *_, int dir_fdnum, const char *path, int flags, int mode
     int create_flags = flags & FILE_CREATION_FLAGS_MASK;
     int follow_links = (flags & O_NOFOLLOW) == 0;
 
-    struct vfs_node *node = vfs_get_node(parent, path, follow_links);
+    struct vfs_node *node = vfs_get_node(parent, basename, follow_links);
     if (node == NULL) {
         if ((create_flags & O_CREAT) != 0) {
-            node = vfs_create(parent, path, (mode & ~proc->umask) | S_IFREG);
+            node = vfs_create(parent, basename, (mode & ~proc->umask) | S_IFREG);
         } else {
             errno = ENOENT;
             goto cleanup;
@@ -513,6 +520,10 @@ int syscall_openat(void *_, int dir_fdnum, const char *path, int flags, int mode
     ret = fdnum_create_from_fd(proc, fd, 0, false);
 
 cleanup:
+    if (basename != NULL) {
+        free(basename);
+    }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
@@ -735,15 +746,16 @@ cleanup:
     return ret;
 }
 
-ssize_t syscall_readlinkat(void *_, int dir_fdnum, const char *path, char *buffer, size_t length) {
+ssize_t syscall_readlinkat(void *_, int dir_fdnum, const char *path, char *buffer, size_t limit) {
     (void)_;
 
-    DEBUG_SYSCALL_ENTER("readlink(%s, %lx, %lu)", path, buffer, length);
+    DEBUG_SYSCALL_ENTER("readlink(%s, %lx, %lu)", path, buffer, limit);
 
     ssize_t ret = -1;
 
     struct vfs_node *parent = NULL;
-    if (!vfs_fdnum_path_to_node(dir_fdnum, path, false, false, &parent, NULL, NULL)) {
+    char *basename = NULL;
+    if (!vfs_fdnum_path_to_node(dir_fdnum, path, false, false, &parent, NULL, &basename)) {
         goto cleanup;
     }
 
@@ -752,7 +764,7 @@ ssize_t syscall_readlinkat(void *_, int dir_fdnum, const char *path, char *buffe
         goto cleanup;
     }
 
-    struct vfs_node *node = vfs_get_node(parent, path, false);
+    struct vfs_node *node = vfs_get_node(parent, basename, false);
     if (node == NULL) {
         goto cleanup;
     }
@@ -762,22 +774,20 @@ ssize_t syscall_readlinkat(void *_, int dir_fdnum, const char *path, char *buffe
         goto cleanup;
     }
 
-    node = reduce_node(node, true);
-    if (node == NULL) {
-        goto cleanup;
+    size_t to_copy = strlen(node->symlink_target) + 1;
+    if (to_copy > limit) {
+        to_copy = limit;
     }
 
-    char path_buffer[PATH_MAX] = {0};
-    if (vfs_pathname(node, path_buffer, PATH_MAX) >= length) {
-        errno = ENAMETOOLONG;
-        goto cleanup;
-    }
+    memcpy(buffer, node->symlink_target, to_copy);
 
-    size_t actual_length = strlen(path_buffer);
-    strncpy(buffer, path_buffer, actual_length);
-    ret = actual_length;
+    ret = to_copy;
 
 cleanup:
+    if (basename != NULL) {
+        free(basename);
+    }
+
     DEBUG_SYSCALL_LEAVE("%lld", ret);
     return ret;
 }
@@ -853,6 +863,10 @@ int syscall_unlinkat(void *_, int dir_fdnum, const char *path, int flags) {
     ret = 0;
 
 cleanup:
+    if (basename != NULL) {
+        free(basename);
+    }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
@@ -864,6 +878,7 @@ int syscall_mkdirat(void *_, int dir_fdnum, const char *path, mode_t mode){
 
     int ret = -1;
 
+    char *basename = NULL;
     struct thread *thread = sched_current_thread();
     struct process *proc = thread->process;
 
@@ -873,7 +888,6 @@ int syscall_mkdirat(void *_, int dir_fdnum, const char *path, mode_t mode){
     }
 
     struct vfs_node *parent = NULL;
-    char *basename = NULL;
     if (!vfs_fdnum_path_to_node(dir_fdnum, path, false, false, &parent, NULL, &basename)) {
         goto cleanup;
     }
@@ -891,6 +905,10 @@ int syscall_mkdirat(void *_, int dir_fdnum, const char *path, mode_t mode){
     ret = 0;
 
 cleanup:
+    if (basename != NULL) {
+        free(basename);
+    }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
