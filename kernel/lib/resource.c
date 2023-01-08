@@ -556,6 +556,10 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
     struct event *events[MAX_PPOLL_FDS];
     struct timer *timer = NULL;
 
+    if (nfds == 0) {
+        goto cleanup;
+    }
+
     // XXX no signals yet
 
     if (nfds > MAX_PPOLL_FDS) {
@@ -585,7 +589,7 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
         if (((uint16_t)status & pollfd->events) != 0) {
             pollfd->revents = (uint16_t)status & pollfd->events;
             ret++;
-            res->unref(res, fd->description);
+            // unref fd
             continue;
         }
 
@@ -639,10 +643,8 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
 
 cleanup:
     for (int i = 0; i < fd_count; i++) {
-        struct f_descriptor *fd = fd_list[i];
-        struct resource *res = fd->description->res;
-
-        res->unref(res, fd->description);
+        //struct f_descriptor *fd = fd_list[i];
+        // unref fds
     }
 
     if (timer != NULL) {
