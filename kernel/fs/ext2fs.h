@@ -108,6 +108,7 @@ uint32_t ext2fs_inodegetblock(struct ext2fs_inode *inode, struct ext2fs *fs, uin
 ssize_t ext2fs_inoderesize(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx, size_t start, size_t count);
 ssize_t ext2fs_inodewrite(struct ext2fs_inode *inode, struct ext2fs *fs, const void *buf, uint32_t inodeidx, off_t off, size_t count);
 size_t ext2fs_bgdallocblock(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t bgdidx);
+size_t ext2fs_bgdallocinode(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t bgdidx);
 ssize_t ext2fs_bgdreadentry(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t idx);
 ssize_t ext2fs_bgdwriteentry(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t idx);
 void ext2fs_init(void);

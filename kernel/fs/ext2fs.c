@@ -20,10 +20,24 @@ static size_t ext2fs_allocblock(struct ext2fs *fs) {
     return -1; // max
 }
 
+static size_t ext2fs_allocinode(struct ext2fs *fs) {
+    struct ext2fs_blockgroupdesc bgd = { 0 };
+
+    for(size_t i = 0; i < fs->bgdcnt; i++) {
+        ext2fs_bgdreadentry(&bgd, fs, i);
+
+        size_t inodeidx = ext2fs_bgdallocinode(&bgd, fs, i);
+
+        return inodeidx + i * fs->sb.blockspergroup;
+    }
+
+    return -1; // max
+}
+
 size_t ext2fs_bgdallocblock(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t bgdidx) {
     if(bgd->unallocb == 0) return -1; // max
     
-    uint8_t *bitmap = alloc(fs->blksize / 8);
+    uint8_t *bitmap = alloc(DIV_ROUNDUP(fs->blksize, 8));
 
     ASSERT_MSG(fs->backing->resource->read(fs->backing->resource, NULL, bitmap, bgd->addrbitmap * fs->blksize, fs->blksize), "ext2fs: unable to read bitmap (block group descriptor)");
 
@@ -33,6 +47,31 @@ size_t ext2fs_bgdallocblock(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs
 
             ASSERT_MSG(fs->backing->resource->write(fs->backing->resource, NULL, bitmap, bgd->addrbitmap * fs->blksize, fs->blksize), "ext2fs: unable to write bitmap (block group descriptor)");
             bgd->unallocb--;
+            ext2fs_bgdwriteentry(bgd, fs, bgdidx);
+
+            free(bitmap);
+
+            return i;
+        }
+    }
+
+    free(bitmap);
+    return -1;
+}
+
+size_t ext2fs_bgdallocinode(struct ext2fs_blockgroupdesc *bgd, struct ext2fs *fs, uint32_t bgdidx) {
+    if(bgd->unallocb == 0) return -1;
+
+    void *bitmap = alloc(DIV_ROUNDUP(fs->blksize, 8));
+
+    ASSERT_MSG(fs->backing->resource->read(fs->backing->resource, NULL, bitmap, bgd->addrinode * fs->blksize, fs->blksize), "ext2fs: unable to read inode bitmap (block group descriptor)");
+
+    for(size_t i = 0; i < fs->blksize; i++) {
+        if(bitmap_test(bitmap, i) == false) {
+            bitmap_set(bitmap, i);
+
+            ASSERT_MSG(fs->backing->resource->write(fs->backing->resource, NULL, bitmap, bgd->addrinode * fs->blksize, fs->blksize), "ext2fs: unable to write inode bitmap (block group descriptor)");
+            bgd->unalloci--;
             ext2fs_bgdwriteentry(bgd, fs, bgdidx);
 
             free(bitmap);
@@ -184,12 +223,12 @@ ssize_t ext2fs_inoderead(struct ext2fs_inode *inode, struct ext2fs *fs, void *bu
         size_t iblock = (off + head) / fs->blksize;
 
         size_t size = count - head;
-        off = (off + head) / fs->blksize;
+        off = (off + head) % fs->blksize;
 
         if(size > (fs->blksize - off)) size = fs->blksize - off;
 
         uint32_t block = ext2fs_inodegetblock(inode, fs, (uint32_t)iblock);
-        if(fs->backing->resource->read(fs->backing->resource, NULL, buf + head, block * fs->blksize + off, size) == -1) return -1;
+        if(fs->backing->resource->read(fs->backing->resource, NULL, (void *)((uint64_t)buf + head), block * fs->blksize + off, size) == -1) return -1;
 
         head += size;
     }
@@ -231,7 +270,7 @@ ssize_t ext2fs_inodewrite(struct ext2fs_inode *inode, struct ext2fs *fs, const v
         if(size > (fs->blksize - off)) size = fs->blksize - off;
 
         uint32_t block = ext2fs_inodegetblock(inode, fs, (uint32_t)iblock);
-        if(fs->backing->resource->write(fs->backing->resource, NULL, buf + head, block * fs->blksize + off, size) == -1) return -1;
+        if(fs->backing->resource->write(fs->backing->resource, NULL, (void *)((uint64_t)buf + head), block * fs->blksize + off, size) == -1) return -1;
 
         head += size;
     }
@@ -264,6 +303,7 @@ ssize_t ext2fs_inodereadentry(struct ext2fs_inode *inode, struct ext2fs *fs, uin
     size_t tableidx = (inodeidx - 1) % fs->sb.inodespergroup;
     size_t bgdidx = (inodeidx - 1) / fs->sb.inodespergroup;
 
+    kernel_print("new thingy!\n");
     struct ext2fs_blockgroupdesc bgd = { 0 };
     ext2fs_bgdreadentry(&bgd, fs, bgdidx);
 
@@ -284,10 +324,51 @@ ssize_t ext2fs_inodewriteentry(struct ext2fs_inode *inode, struct ext2fs *fs, ui
     return 1;
 }
 
+static ssize_t ext2fs_createdirentry(struct ext2fs *fs, struct ext2fs_inode *parent, uint32_t parentidx, uint32_t newinode, uint8_t dirtype, const char *name) {
+    void *buf = alloc(parent->sizelo);
+
+    ext2fs_inoderead(parent, fs, buf, 0, parent->sizelo);
+
+    bool found = false;
+
+    for(size_t i = 0; i < parent->sizelo;) {
+        struct ext2fs_direntry *direntry = (struct ext2fs_direntry *)((uint64_t)buf + i);
+
+        if(found) {
+            direntry->inodeidx = newinode;
+            direntry->dirtype = dirtype;
+            direntry->namelen = strlen(name);
+            direntry->entsize = parent->sizelo - i;
+
+            memcpy((void *)((uint64_t)direntry + sizeof(struct ext2fs_direntry)), name, direntry->namelen);
+
+            ext2fs_inodewrite(parent, fs, buf, parentidx, 0, parent->sizelo);
+
+            return 0;
+        }
+
+        size_t expected = ALIGN_UP(sizeof(struct ext2fs_direntry) + direntry->namelen, 4);
+        if(direntry->entsize != expected) {
+            direntry->entsize = expected;
+            i += expected;
+            found = true;
+            continue;
+        }
+
+        i += direntry->entsize;
+
+    }
+
+    free(buf);
+
+    return -1;
+}
+
 static ssize_t ext2fs_resread(struct resource *this_, struct f_description *description, void *buf, off_t loc, size_t count) {
     (void)description;
     struct ext2fs_inode curinode = { 0 };
 
+    kernel_print("reading\n");
     ext2fs_inodereadentry(&curinode, ((struct ext2fs_resource *)this_)->fs, this_->stat.st_ino);
 
     return ext2fs_inoderead(&curinode, ((struct ext2fs_resource *)this_)->fs, buf, loc, count);
@@ -297,6 +378,7 @@ static ssize_t ext2fs_reswrite(struct resource *this_, struct f_description *des
     (void)description;
     struct ext2fs_inode curinode = { 0 };
 
+    kernel_print("writing %d\n", this_->stat.st_ino);
     ext2fs_inodereadentry(&curinode, ((struct ext2fs_resource *)this_)->fs, this_->stat.st_ino); // find inode entry associated with this
 
     return ext2fs_inodewrite(&curinode, ((struct ext2fs_resource *)this_)->fs, buf, this_->stat.st_ino, loc, count);
@@ -304,21 +386,50 @@ static ssize_t ext2fs_reswrite(struct resource *this_, struct f_description *des
 
 static struct vfs_node *ext2fs_mount(struct vfs_node *parent, const char *name, struct vfs_node *source);
 
-static inline struct ext2fs_resource *create_ext2fs_resource(struct ext2fs *this_, int mode) {
-    
-}
-
 static struct vfs_node *ext2fs_create(struct vfs_filesystem *this_, struct vfs_node *parent, const char *name, int mode) {
     struct vfs_node *node = NULL;
     struct ext2fs_resource *resource = NULL;
+    struct ext2fs *this = (struct ext2fs *)this_;
 
     node = vfs_create_node(this_, parent, name, S_ISDIR(mode));
     if(node == NULL) goto fail;
     
-    resource = create_ext2fs_resource((struct ext2fs *)this_, mode);
+    resource = resource_create(sizeof(struct ext2fs_resource));
     if(resource == NULL) goto fail;
 
+    resource->read = ext2fs_resread;
+    resource->write = ext2fs_reswrite;
+
+    resource->stat.st_size = 0;
+    resource->stat.st_blocks = 0;
+    resource->stat.st_blksize = this->blksize;
+    resource->stat.st_dev = this->devid;
+    resource->stat.st_mode = mode;
+    resource->stat.st_nlink = 1;
+
+    resource->stat.st_atim = time_realtime;
+    resource->stat.st_ctim = time_realtime;
+    resource->stat.st_mtim = time_realtime;
+
+    resource->stat.st_ino = ext2fs_allocinode(this);
+
+    struct ext2fs_inode parentinode = { 0 };
+    ext2fs_inodereadentry(&parentinode, this, parent->resource->stat.st_ino);
+
+    uint8_t dirtype = S_ISREG(mode) ? 1 : 
+        S_ISDIR(mode) ? 2 : 
+        S_ISCHR(mode) ? 3 :
+        S_ISBLK(mode) ? 4 :
+        S_ISFIFO(mode) ? 5 :
+        S_ISSOCK(mode) ? 6 :
+        7;
+
+    kernel_print("%llx\n", parent->resource);
+
+    ext2fs_createdirentry(this, &parentinode, parent->resource->stat.st_ino, resource->stat.st_ino, dirtype, name);
+
     node->resource = (struct resource *)resource;
+    kernel_print("created\n");
     return node;
 
 fail:
