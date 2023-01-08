@@ -239,7 +239,6 @@ bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
             free(rr.basename);
         }
         if (source_node == NULL) {
-
             goto cleanup;
         }
         if (S_ISDIR(source_node->resource->stat.st_mode)) {
@@ -262,6 +261,7 @@ bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
     }
 
     struct vfs_node *mount_node = fs->mount(r.target_parent, r.basename, source_node);
+    
     r.target->mountpoint = mount_node;
 
     create_dotentries(mount_node, r.target_parent);
