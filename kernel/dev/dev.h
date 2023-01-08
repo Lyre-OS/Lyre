@@ -19,7 +19,7 @@ extern symbol drivers_start;
 extern symbol drivers_end;
 
 #define EXPORT_PCI_DRIVER(drv) \
-    __attribute__((maybe_unused, used, section(".drivers"))) \
+    __attribute__((used, section(".drivers"))) \
     static struct driver __##drv = { .type = DRIVER_PCI, .pci_dev = &drv }
 
 #define DRIVER_FOR_EACH(TYPE, BINDING, ...) do { \
