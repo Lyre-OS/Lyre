@@ -409,8 +409,12 @@ size_t vfs_pathname(struct vfs_node *node, char *buffer, size_t len) {
         }
     }
 
-    strncpy(buffer + offset, node->name, len - offset);
-    return strlen(node->name) + offset;
+    if (strcmp(node->name, "/") != 0) {
+        strncpy(buffer + offset, node->name, len - offset);
+        return strlen(node->name) + offset;
+    } else {
+        return offset;
+    }
 }
 
 bool vfs_fdnum_path_to_node(int dir_fdnum, const char *path, bool empty_path, bool enoent_error,
