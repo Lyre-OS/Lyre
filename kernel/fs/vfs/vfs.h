@@ -19,6 +19,7 @@ struct vfs_node {
     struct vfs_node *parent;
     HASHMAP_TYPE(struct vfs_node *) children;
     char *symlink_target;
+    bool populated;
 };
 
 struct vfs_filesystem {
@@ -34,6 +35,7 @@ extern struct vfs_node *vfs_root;
 void vfs_init(void);
 struct vfs_node *vfs_create_node(struct vfs_filesystem *fs, struct vfs_node *parent,
                                  const char *name, bool dir);
+void vfs_create_dotentries(struct vfs_node *node, struct vfs_node *parent);
 void vfs_add_filesystem(struct vfs_filesystem *fs, const char *identifier);
 struct vfs_node *vfs_get_node(struct vfs_node *parent, const char *path, bool follow_links);
 bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
