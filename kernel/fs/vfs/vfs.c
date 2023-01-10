@@ -527,6 +527,7 @@ cleanup:
     if (basename != NULL) {
         free(basename);
     }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
@@ -782,14 +783,15 @@ ssize_t syscall_readlinkat(void *_, int dir_fdnum, const char *path, char *buffe
         to_copy = limit;
     }
 
-    memcpy(buffer, node->symlink_target, to_copy); 
- 
+    memcpy(buffer, node->symlink_target, to_copy);
+
     ret = to_copy;
 
 cleanup:
     if (basename != NULL) {
         free(basename);
     }
+
     DEBUG_SYSCALL_LEAVE("%lld", ret);
     return ret;
 }
@@ -868,6 +870,7 @@ cleanup:
     if (basename != NULL) {
         free(basename);
     }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
@@ -909,6 +912,7 @@ cleanup:
     if (basename != NULL) {
         free(basename);
     }
+
     DEBUG_SYSCALL_LEAVE("%d", ret);
     return ret;
 }
