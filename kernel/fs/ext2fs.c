@@ -4,14 +4,13 @@
 #include <lib/bitmap.h>
 #include <lib/errno.h>
 #include <lib/print.h>
+#include <lib/random.h>
 #include <lib/resource.h>
 #include <lib/vector.h>
 #include <mm/mmap.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
 #include <time/time.h>
-
-// TODO: Future improvement may be to implement 64-bit sizes in place of seemingly varying sizes
 
 struct ext2fs_superblock {
     uint32_t inodecnt;
@@ -45,9 +44,9 @@ struct ext2fs_superblock {
     uint16_t sbbgd;
     uint32_t optionalfts;
     uint32_t reqfts;
-    uint64_t uuid[2]; // filesystem uuid
-    uint64_t name[2];
-    uint64_t lastmountedpath[8]; // last path we had when mounted
+    char uuid[16]; // filesystem uuid
+    char name[16];
+    char lastmountedpath[64]; // last path we had when mounted
 } __attribute__((packed));
 
 struct ext2fs_blockgroupdesc {
@@ -72,12 +71,13 @@ struct ext2fs_inode {
     uint16_t hardlinkcnt;
     uint32_t sectors;
     uint32_t flags;
-    uint32_t oss;
+    uint32_t osd1;
     uint32_t blocks[15];
     uint32_t gennum;
     uint32_t eab;
     uint32_t sizehi;
     uint32_t fragaddr;
+    uint32_t osd2[3];
 } __attribute__((packed));
 
 struct ext2fs_direntry {
@@ -107,6 +107,9 @@ struct ext2fs_resource {
     struct ext2fs *fs;
 };
 
+#define EXT2FS_INODESIZE(a) ({ (uint64_t)((uint64_t)(a)->sizelo | ((uint64_t)(a)->sizehi << 32)); })
+#define EXT2FS_INODESETSIZE(a, b) ({ (a)->sizelo = (uint32_t)(b); (a)->sizehi = (uint32_t)((b) >> 32); })
+
 static ssize_t ext2fs_inoderead(struct ext2fs_inode *inode, struct ext2fs *fs, void *buf, off_t off, size_t count);
 static ssize_t ext2fs_inodereadentry(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx);
 static ssize_t ext2fs_inodewriteentry(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx);
@@ -118,7 +121,7 @@ static void ext2fs_writesuperblock(struct ext2fs *fs) {
     fs->backing->resource->write(fs->backing->resource, NULL, &fs->sb, fs->backing->resource->stat.st_blksize * 2, sizeof(struct ext2fs_superblock));
 }
 
-static size_t ext2fs_allocblock(struct ext2fs *fs) {
+static size_t ext2fs_allocblock(struct ext2fs *fs, struct ext2fs_inode *inode, uint32_t inodeidx) {
     for (size_t i = 0; i < fs->sb.blockcnt; i++) {
         struct ext2fs_blockgroupdesc bgd = { 0 };
         ext2fs_bgdreadentry(&bgd, fs, i);
@@ -159,6 +162,9 @@ static size_t ext2fs_allocblock(struct ext2fs *fs) {
 
         fs->sb.unallocb--;
         bgd.unallocb--;
+
+        inode->sectors += (fs->blksize / fs->backing->resource->stat.st_blksize);
+        ext2fs_inodewriteentry(inode, fs, inodeidx);
 
         ext2fs_bgdwriteentry(&bgd, fs, i);
         ext2fs_writesuperblock(fs);
@@ -362,14 +368,14 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
             uint32_t singleindirectidx = 0;
 
             if (inode->blocks[14] == 0) {
-                inode->blocks[14] = ext2fs_allocblock(fs);
+                inode->blocks[14] = ext2fs_allocblock(fs, inode, inodeidx);
                 ext2fs_inodewriteentry(inode, fs, inodeidx);
             }
 
             fs->backing->resource->read(fs->backing->resource, NULL, &singleindirectidx, inode->blocks[14] * fs->blksize + doubleindirect * 4, sizeof(uint32_t)); // get our index
 
             if (singleindirectidx == 0) {
-                singleindirectidx = ext2fs_allocblock(fs);
+                singleindirectidx = ext2fs_allocblock(fs, inode, inodeidx);
 
                 fs->backing->resource->write(fs->backing->resource, NULL, &singleindirectidx, inode->blocks[14] * fs->blksize + doubleindirect * 4, sizeof(uint32_t)); // write new index
             }
@@ -377,7 +383,7 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
             fs->backing->resource->read(fs->backing->resource, NULL, &indirectblock, doubleindirect * fs->blksize + singleindirectidx * 4, sizeof(uint32_t));
 
             if (indirectblock == 0) {
-                uint32_t new = ext2fs_allocblock(fs);
+                uint32_t new = ext2fs_allocblock(fs, inode, inodeidx);
 
                 fs->backing->resource->write(fs->backing->resource, NULL, &indirectblock, doubleindirect * fs->blksize + singleindirectidx * 4, sizeof(uint32_t));
 
@@ -390,7 +396,7 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
         }
 
         if (inode->blocks[13] == 0) {
-            inode->blocks[13] = ext2fs_allocblock(fs);
+            inode->blocks[13] = ext2fs_allocblock(fs, inode, inodeidx);
 
             ext2fs_inodewriteentry(inode, fs, inodeidx);
         }
@@ -398,7 +404,7 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
         fs->backing->resource->read(fs->backing->resource, NULL, &indirectblock, inode->blocks[13] * fs->blksize + singleidx * 4, sizeof(uint32_t));
 
         if (indirectblock == 0) {
-            indirectblock = ext2fs_allocblock(fs);
+            indirectblock = ext2fs_allocblock(fs, inode, inodeidx);
 
             fs->backing->resource->write(fs->backing->resource, NULL, &indirectblock, inode->blocks[13] * fs->blksize + singleidx * 4, sizeof(uint32_t));
         }
@@ -408,7 +414,7 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
         return dblock;
     } else {
         if (inode->blocks[12] == 0) {
-            inode->blocks[12] = ext2fs_allocblock(fs);
+            inode->blocks[12] = ext2fs_allocblock(fs, inode, inodeidx);
 
             ext2fs_inodewriteentry(inode, fs, inodeidx);
         }
@@ -419,36 +425,41 @@ static ssize_t ext2fs_inodesetblock(struct ext2fs_inode *inode, struct ext2fs *f
     return dblock;
 }
 
-static ssize_t ext2fs_inodeensurelen(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx, size_t start, size_t count) {
-    size_t iblockstart = DIV_ROUNDUP(inode->sectors * fs->backing->resource->stat.st_blksize, fs->blksize);
-    size_t iblockend = DIV_ROUNDUP(start + count, fs->blksize);
+static void ext2fs_inodeassignblocks(struct ext2fs_inode *inode, uint32_t inodeidx, struct ext2fs *fs, size_t start, size_t blocks) {
+    for (size_t i = 0; i < blocks;) {
+        if (ext2fs_inodegetblock(inode, fs, start + i)) {
+            i++;
+            continue; // ignore any already allocated block ranges
+        }
+        size_t dblock = ext2fs_allocblock(fs, inode, inodeidx);
+        ext2fs_inodesetblock(inode, fs, inodeidx, start + i, dblock); // set a new block
+        i++;
+    }
 
-    if (inode->sizelo < (start + count)) {
-        inode->sizelo = start + count;
+    ext2fs_inodewriteentry(inode, fs, inodeidx);
+}
+
+static ssize_t ext2fs_inodegrow(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx, size_t start, size_t count) {
+    size_t iblockstart = (start & ~(fs->blksize - 1)) >> (10 + fs->sb.blksize);
+    size_t iblockend = ((start & (fs->blksize - 1)) + count + (fs->blksize - 1)) >> (10 + fs->sb.blksize);
+
+    if (EXT2FS_INODESIZE(inode) < (start + count)) {
+        EXT2FS_INODESETSIZE(inode, start + count);
     } else {
         return 0;
     }
 
-    for (size_t i = iblockstart; i < iblockend; i++) {
-        size_t dblock = ext2fs_allocblock(fs);
-
-        inode->sectors = fs->blksize / fs->backing->resource->stat.st_blksize;
-
-        ext2fs_inodesetblock(inode, fs, inodeidx, i, dblock);
-    }
-
-    ext2fs_inodewriteentry(inode, fs, inodeidx);
-
+    ext2fs_inodeassignblocks(inode, inodeidx, fs, iblockstart, iblockend);
     return 0;
 }
 
 static ssize_t ext2fs_inoderead(struct ext2fs_inode *inode, struct ext2fs *fs, void *buf, off_t off, size_t count) {
-    if (off > inode->sizelo) {
+    if (off > (off_t)EXT2FS_INODESIZE(inode)) {
         return 0;
     }
 
-    if ((off + count) > inode->sizelo) {
-        count = inode->sizelo - off;
+    if ((off + count) > EXT2FS_INODESIZE(inode)) {
+        count = EXT2FS_INODESIZE(inode) - off;
     }
 
     for (size_t head = 0; head < count;) { // force reads to be block-wise
@@ -473,7 +484,7 @@ static ssize_t ext2fs_inoderead(struct ext2fs_inode *inode, struct ext2fs *fs, v
 }
 
 static ssize_t ext2fs_inodewrite(struct ext2fs_inode *inode, struct ext2fs *fs, const void *buf, uint32_t inodeidx, off_t off, size_t count) {
-    ext2fs_inodeensurelen(inode, fs, inodeidx, off, count); // ensure inode is the right size
+    ext2fs_inodegrow(inode, fs, inodeidx, off, count); // ensure inode is the right size
 
     for (size_t head = 0; head < count;) { // force writes to be block-wise
         size_t iblock = (off + head) / fs->blksize;
@@ -496,23 +507,23 @@ static ssize_t ext2fs_inodewrite(struct ext2fs_inode *inode, struct ext2fs *fs, 
 }
 
 static ssize_t ext2fs_createdirentry(struct ext2fs *fs, struct ext2fs_inode *parent, uint32_t parentidx, uint32_t newidx, uint8_t dirtype, const char *name) {
-    uint8_t *buf = alloc(parent->sizelo);
-    ext2fs_inoderead(parent, fs, buf, 0, parent->sizelo);
+    uint8_t *buf = alloc(EXT2FS_INODESIZE(parent));
+    ext2fs_inoderead(parent, fs, buf, 0, EXT2FS_INODESIZE(parent));
 
     bool found = false;
 
-    for (size_t i = 0; i < parent->sizelo;) {
+    for (size_t i = 0; i < EXT2FS_INODESIZE(parent);) {
         struct ext2fs_direntry *entry = (struct ext2fs_direntry *)((uint64_t)buf + i);
 
         if (found) {
             entry->inodeidx = newidx;
             entry->dirtype = dirtype;
             entry->namelen = strlen(name);
-            entry->entsize = parent->sizelo - i;
+            entry->entsize = EXT2FS_INODESIZE(parent) - i;
 
             memcpy((void *)((uint64_t)entry + sizeof(struct ext2fs_direntry)), name, strlen(name));
 
-            ext2fs_inodewrite(parent, fs, buf, parentidx, 0, parent->sizelo);
+            ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
 
             free(buf);
             return 0;
@@ -537,11 +548,11 @@ static ssize_t ext2fs_createdirentry(struct ext2fs *fs, struct ext2fs_inode *par
 }
 
 static bool ext2fs_removedirentry(struct ext2fs *fs, struct ext2fs_inode *parent, uint32_t parentidx, uint32_t inodeidx, bool deleteinode) {
-    uint8_t *buf = alloc(parent->sizelo);
-    ext2fs_inoderead(parent, fs, buf, 0, parent->sizelo);
+    uint8_t *buf = alloc(EXT2FS_INODESIZE(parent));
+    ext2fs_inoderead(parent, fs, buf, 0, EXT2FS_INODESIZE(parent));
 
     struct ext2fs_direntry *preventry = NULL;
-    for (size_t i = 0; i < parent->sizelo;) {
+    for (size_t i = 0; i < EXT2FS_INODESIZE(parent);) {
         struct ext2fs_direntry *entry = (struct ext2fs_direntry *)((uint64_t)buf + i);
         if (preventry == NULL) {
             preventry = entry;
@@ -561,7 +572,7 @@ static bool ext2fs_removedirentry(struct ext2fs *fs, struct ext2fs_inode *parent
                 preventry->entsize += oldentsize; // grow entry
             }
 
-            ext2fs_inodewrite(parent, fs, buf, parentidx, 0, parent->sizelo);
+            ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
 
             struct ext2fs_inode inode = { 0 };
             ext2fs_inodereadentry(&inode, fs, oldentinode);
@@ -661,6 +672,10 @@ static ssize_t ext2fs_resread(struct resource *_this, struct f_description *desc
         count = count - ((loc + count) - this->stat.st_size); // reading will only ever read total size!
     }
 
+    this->stat.st_atim = time_realtime;
+    curinode.accesstime = this->stat.st_atim.tv_sec;
+    ext2fs_inodewriteentry(&curinode, this->fs, this->stat.st_ino);
+
     ssize_t ret = ext2fs_inoderead(&curinode, this->fs, buf, loc, count);
     spinlock_release(&this->lock);
     return ret;
@@ -681,6 +696,15 @@ static ssize_t ext2fs_reswrite(struct resource *_this, struct f_description *des
         this->stat.st_blocks = DIV_ROUNDUP(this->stat.st_size, this->stat.st_blksize);
     }
 
+    this->stat.st_atim = time_realtime;
+    this->stat.st_mtim = time_realtime;
+    curinode.accesstime = this->stat.st_atim.tv_sec;
+    curinode.modifiedtime = this->stat.st_mtim.tv_sec;
+    ext2fs_inodewriteentry(&curinode, this->fs, this->stat.st_ino);
+
+    this->fs->sb.lastwritten = time_realtime.tv_sec;
+    ext2fs_writesuperblock(this->fs);
+
     ssize_t ret = ext2fs_inodewrite(&curinode, this->fs, buf, this->stat.st_ino, loc, count); // pass to low level write
     spinlock_release(&this->lock);
     return ret;
@@ -694,7 +718,18 @@ static bool ext2fs_restruncate(struct resource *_this, struct f_description *des
     struct ext2fs_inode curinode = { 0 };
     ext2fs_inodereadentry(&curinode, this->fs, this->stat.st_ino);
 
-    ext2fs_inodeensurelen(&curinode, this->fs, this->stat.st_ino, 0, length); // shrink/grow as we see fit
+    this->stat.st_atim = time_realtime;
+    this->stat.st_mtim = time_realtime;
+    curinode.accesstime = this->stat.st_atim.tv_sec;
+    curinode.modifiedtime = this->stat.st_mtim.tv_sec; 
+    ext2fs_inodewriteentry(&curinode, this->fs, this->stat.st_ino);
+
+    if (length > EXT2FS_INODESIZE(&curinode)) {
+        ext2fs_inodegrow(&curinode, this->fs, this->stat.st_ino, 0, length); // grow
+    } else if (length < EXT2FS_INODESIZE(&curinode)) {
+        EXT2FS_INODESETSIZE(&curinode, length);
+        // TODO: Free unused blocks
+    }
 
     this->stat.st_size = (off_t)length;
     this->stat.st_blocks = DIV_ROUNDUP(this->stat.st_size, this->stat.st_blksize);
@@ -827,16 +862,17 @@ static struct vfs_node *ext2fs_create(struct vfs_filesystem *_this, struct vfs_n
         .deletedtime = 0,
         .gid = 0,
         .hardlinkcnt = 1,
-        .sectors = this->blksize / this->backing->resource->stat.st_blksize,
+        .sectors = 0,
         .flags = 0,
-        .oss = 0,
+        .osd1 = 0,
         .blocks = {},
-        .gennum = 0,
+        .gennum = random_generate(),
         .eab = 0,
         .sizehi = 0,
         .fragaddr = 0,
+        .osd2 = {}
     };
-    inode.blocks[0] = ext2fs_allocblock(this);
+    ext2fs_inodeassignblocks(&inode, resource->stat.st_ino, this, 0, 1);
 
     ext2fs_inodewriteentry(&inode, this, resource->stat.st_ino);
 
@@ -876,6 +912,9 @@ static struct vfs_node *ext2fs_create(struct vfs_filesystem *_this, struct vfs_n
         ext2fs_inodewriteentry(&inode, this, resource->stat.st_ino);
     }
 
+    this->sb.lastwritten = time_realtime.tv_sec;
+    ext2fs_writesuperblock(this);
+
     ext2fs_createdirentry(this, &parentinode, parent->resource->stat.st_ino, resource->stat.st_ino, dirtype, name);
 
     resource->fs = this;
@@ -897,12 +936,12 @@ fail:
 }
 
 static void ext2fs_readlink(struct ext2fs_inode *inode, struct ext2fs *fs, char *buffer) {
-    if (inode->sizelo <= 60) { // fast
-        strncpy(buffer, (const char *)inode->blocks, inode->sizelo);
+    if (EXT2FS_INODESIZE(inode) <= 60) { // fast
+        strncpy(buffer, (const char *)inode->blocks, EXT2FS_INODESIZE(inode));
         return;
     }
 
-    ext2fs_inoderead(inode, fs, buffer, 0, inode->sizelo); // slow
+    ext2fs_inoderead(inode, fs, buffer, 0, EXT2FS_INODESIZE(inode)); // slow
 }
 
 static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node) {
@@ -910,10 +949,10 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
     struct ext2fs_inode parent = { 0 };
     ext2fs_inodereadentry(&parent, fs, node->resource->stat.st_ino);
 
-    void *buf = alloc(parent.sizelo);
-    ext2fs_inoderead(&parent, fs, buf, 0, parent.sizelo);
+    void *buf = alloc(EXT2FS_INODESIZE(&parent));
+    ext2fs_inoderead(&parent, fs, buf, 0, EXT2FS_INODESIZE(&parent));
 
-    for (size_t i = 0; i < parent.sizelo;) {
+    for (size_t i = 0; i < EXT2FS_INODESIZE(&parent);) {
         struct ext2fs_direntry *direntry = (struct ext2fs_direntry *)((uint64_t)buf + i);
 
         char *namebuf = alloc(direntry->namelen + 1);
@@ -930,7 +969,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         }
 
         struct ext2fs_inode inode = { 0 };
-        ext2fs_inodereadentry(&inode, fs, direntry->inodeidx);
+        ext2fs_inodereadentry(&inode, fs, direntry->inodeidx); 
 
         uint16_t mode = (inode.perms & 0xFFF) |
             (direntry->dirtype == 1 ? S_IFREG :
@@ -958,7 +997,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         fres->stat.st_gid = inode.gid;
         fres->stat.st_mode = mode;
         fres->stat.st_ino = direntry->inodeidx;
-        fres->stat.st_size = inode.sizelo | ((uint64_t)inode.sizehi >> 32);
+        fres->stat.st_size = EXT2FS_INODESIZE(&inode);
         fres->stat.st_nlink = inode.hardlinkcnt;
         fres->refcount = S_ISDIR(mode) ? inode.hardlinkcnt - 1 : inode.hardlinkcnt; // exclude dot entries in directory inode links (our vfs relies on its own implementation)
         fres->stat.st_blksize = fs->blksize;
@@ -981,7 +1020,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         }
 
         if (S_ISLNK(mode)) {
-            char *linkbuffer = alloc(inode.sizelo);
+            char *linkbuffer = alloc(EXT2FS_INODESIZE(&inode));
             ext2fs_readlink(&inode, fs, linkbuffer); // implicit acceptance of link buffer length being the same as the inode
             fnode->symlink_target = strdup(linkbuffer);
             free(linkbuffer); // free current context
@@ -1061,7 +1100,7 @@ static struct vfs_node *ext2fs_mount(struct vfs_node *parent, const char *name, 
     source->resource->read(source->resource, NULL, &new_fs->sb, source->resource->stat.st_blksize * 2, sizeof(struct ext2fs_superblock));
 
     if (new_fs->sb.sig != 0xef53) {
-        panic(NULL, false, "Told to mount an ext2 filesystem whilst source is not ext2!");
+        return NULL; // signature is not correct
     }
 
     new_fs->backing = source;
@@ -1069,7 +1108,13 @@ static struct vfs_node *ext2fs_mount(struct vfs_node *parent, const char *name, 
     new_fs->fragsize = 1024 << new_fs->sb.fragsize;
     new_fs->bgdcnt = new_fs->sb.blockcnt / new_fs->sb.blockspergroup;
 
-    ASSERT_MSG(!ext2fs_inodereadentry(&new_fs->root, new_fs, 2), "ext2fs: unable to read root inode");
+    new_fs->sb.lastmnt = time_realtime.tv_sec;
+    ext2fs_writesuperblock(new_fs);
+
+    if (ext2fs_inodereadentry(&new_fs->root, new_fs, 2)) {
+        kernel_print("ext2fs: unable to read root inode, aborted\n");
+        return NULL;
+    }
 
     struct vfs_node *node = vfs_create_node((struct vfs_filesystem *)new_fs, parent, name, true);
     if (node == NULL) {

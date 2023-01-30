@@ -284,8 +284,8 @@ struct nvme_nsdevice {
     size_t lbacount;
     size_t maxphysrpgs;
     size_t overwritten;
-    struct cachedblock *cache;
     size_t cacheblocksize;
+    struct cachedblock *cache; 
 };
 
 static size_t nvme_devcount = 0;
@@ -515,11 +515,13 @@ static ssize_t nvme_cacheblock(struct nvme_nsdevice *ns, uint64_t block) {
         }
     }
 
-    // overwrite an existing cache (we needn't worry about overwriting anything cache-wise as they just exist to speed up repitition of recent block reads)
+    // no free caches left, overwrite an existing cache (we needn't worry about overwriting anything cache-wise as they just exist to speed up repitition of recent block reads)
     if (ns->overwritten == 512) {
         ns->overwritten = 0;
+        target = ns->overwritten;
+    } else {
+        target = ns->overwritten++;
     }
-    target = ns->overwritten++;
 
     goto notfound;
 
@@ -585,12 +587,14 @@ static ssize_t nvme_write(struct resource *_this, struct f_description *descript
 
         uint64_t chunk = count - progress;
         size_t off = (loc + progress) % this->cacheblocksize;
-        if (chunk > this->cacheblocksize - off) chunk = this->cacheblocksize - off;
+        if (chunk > this->cacheblocksize - off) {
+            chunk = this->cacheblocksize - off;
+        }
 
         // copy buffer into cache (for writing)
         memcpy(&this->cache[slot].cache[off], buf + progress, chunk);
         this->cache[slot].status = NVME_READYCACHE; // in usage (allow for cache hits)
-        int ret = nvme_rwlba(this, this->cache[slot].cache, this->cacheblocksize / this->lbasize * this->cache[slot].block, this->cacheblocksize / this->lbasize, 1);
+        int ret = nvme_rwlba(this, this->cache[slot].cache, (this->cacheblocksize / this->lbasize) * this->cache[slot].block, this->cacheblocksize / this->lbasize, 1);
         if (ret == -1) {
             spinlock_release(&this->lock);
             return -1;
@@ -609,16 +613,16 @@ static void nvme_initnamespace(size_t id, struct nvme_device *controller) {
     struct nvme_nsid *nsid = (struct nvme_nsid *)alloc(sizeof(struct nvme_nsid));
     ASSERT_MSG(!nvme_nsid(nsdev_res, nsid), "nvme: failed to obtain namespace info for n1");
 
-    uint64_t lbashift = nsid->lbaf[nsid->flbas & 0x0f].ds;
+    uint64_t formattedlba = nsid->flbas & 0x0f;
+    uint64_t lbashift = nsid->lbaf[formattedlba].ds;
     uint64_t maxlbas = 1 << (controller->maxtransshift - lbashift);
-    nsdev_res->cacheblocksize = (maxlbas * (1 << lbashift));
     nsdev_res->maxphysrpgs = (maxlbas * (1 << lbashift)) / PAGE_SIZE;
 
     ASSERT_MSG(!nvme_createqueues(controller, nsdev_res, id), "nvme: failed to create IO queues");
-
-    uint64_t formattedlba = nsid->flbas & 0x0f;
+ 
     nsdev_res->cache = alloc(sizeof(struct cachedblock) * 512); // set up our cache
     nsdev_res->lbasize = 1 << nsid->lbaf[formattedlba].ds;
+    nsdev_res->cacheblocksize = nsdev_res->lbasize * 4; // cache disk blocks in each cache block (less time spent dealing with block reads from disk and overwrites)
     nsdev_res->lbacount = nsid->size;
 
     nsdev_res->can_mmap = false;

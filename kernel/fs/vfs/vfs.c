@@ -265,6 +265,9 @@ bool vfs_mount(struct vfs_node *parent, const char *source, const char *target,
     }
 
     struct vfs_node *mount_node = fs->mount(r.target_parent, r.basename, source_node);
+    if (mount_node == NULL) {
+        goto cleanup; // failed to mount
+    }
     r.target->mountpoint = mount_node;
 
     vfs_create_dotentries(mount_node, r.target_parent);
