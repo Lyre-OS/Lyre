@@ -118,6 +118,26 @@ static void *inner_alloc(size_t pages, uint64_t limit) {
     return NULL;
 }
 
+void *pmm_alloc_below(size_t pages, uint64_t below_page)
+{
+    spinlock_acquire(&lock);
+
+    size_t last = last_used_index;
+    void *ret = inner_alloc(pages, below_page);
+
+    if (ret == NULL) {
+        last_used_index = 0;
+        kernel_print("pmm_alloc_below: ERROR: ret NULL \n");
+        do {} while (1);
+    }
+
+    // TODO: Check if ret is null and panic
+    used_pages += pages;
+
+    spinlock_release(&lock);
+    return ret;    
+}
+
 void *pmm_alloc(size_t pages) {
     void *ret = pmm_alloc_nozero(pages);
     if (ret != NULL) {
