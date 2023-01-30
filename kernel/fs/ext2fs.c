@@ -440,16 +440,10 @@ static void ext2fs_inodeassignblocks(struct ext2fs_inode *inode, uint32_t inodei
 }
 
 static ssize_t ext2fs_inodegrow(struct ext2fs_inode *inode, struct ext2fs *fs, uint32_t inodeidx, size_t start, size_t count) {
-    size_t iblockstart = (start & ~(fs->blksize - 1)) >> (10 + fs->sb.blksize);
-    size_t iblockend = ((start & (fs->blksize - 1)) + count + (fs->blksize - 1)) >> (10 + fs->sb.blksize);
+    size_t boffset = (start & ~(fs->blksize - 1)) >> (10 + fs->sb.blksize);
+    size_t bcount = ((start & (fs->blksize - 1)) + count + (fs->blksize - 1)) >> (10 + fs->sb.blksize);
 
-    if (EXT2FS_INODESIZE(inode) < (start + count)) {
-        EXT2FS_INODESETSIZE(inode, start + count);
-    } else {
-        return 0;
-    }
-
-    ext2fs_inodeassignblocks(inode, inodeidx, fs, iblockstart, iblockend);
+    ext2fs_inodeassignblocks(inode, inodeidx, fs, boffset, bcount);
     return 0;
 }
 
@@ -485,6 +479,11 @@ static ssize_t ext2fs_inoderead(struct ext2fs_inode *inode, struct ext2fs *fs, v
 
 static ssize_t ext2fs_inodewrite(struct ext2fs_inode *inode, struct ext2fs *fs, const void *buf, uint32_t inodeidx, off_t off, size_t count) {
     ext2fs_inodegrow(inode, fs, inodeidx, off, count); // ensure inode is the right size
+
+    if (off + count > EXT2FS_INODESIZE(inode)) {
+        EXT2FS_INODESETSIZE(inode, off + count);
+        ext2fs_inodewriteentry(inode, fs, inodeidx);
+    }
 
     for (size_t head = 0; head < count;) { // force writes to be block-wise
         size_t iblock = (off + head) / fs->blksize;
@@ -721,15 +720,16 @@ static bool ext2fs_restruncate(struct resource *_this, struct f_description *des
     this->stat.st_atim = time_realtime;
     this->stat.st_mtim = time_realtime;
     curinode.accesstime = this->stat.st_atim.tv_sec;
-    curinode.modifiedtime = this->stat.st_mtim.tv_sec; 
-    ext2fs_inodewriteentry(&curinode, this->fs, this->stat.st_ino);
+    curinode.modifiedtime = this->stat.st_mtim.tv_sec;  
 
     if (length > EXT2FS_INODESIZE(&curinode)) {
         ext2fs_inodegrow(&curinode, this->fs, this->stat.st_ino, 0, length); // grow
     } else if (length < EXT2FS_INODESIZE(&curinode)) {
-        EXT2FS_INODESETSIZE(&curinode, length);
         // TODO: Free unused blocks
     }
+
+    EXT2FS_INODESETSIZE(&curinode, length);
+    ext2fs_inodewriteentry(&curinode, this->fs, this->stat.st_ino);
 
     this->stat.st_size = (off_t)length;
     this->stat.st_blocks = DIV_ROUNDUP(this->stat.st_size, this->stat.st_blksize);
