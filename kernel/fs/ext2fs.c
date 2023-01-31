@@ -969,7 +969,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         }
 
         struct ext2fs_inode inode = { 0 };
-        ext2fs_inodereadentry(&inode, fs, direntry->inodeidx); 
+        ext2fs_inodereadentry(&inode, fs, direntry->inodeidx);
 
         uint16_t mode = (inode.perms & 0xFFF) |
             (direntry->dirtype == 1 ? S_IFREG :
