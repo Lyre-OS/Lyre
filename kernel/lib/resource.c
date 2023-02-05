@@ -552,7 +552,7 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
 
     int fd_count = 0, event_count = 0, ret = 0;
     int fd_nums[MAX_PPOLL_FDS];
-    struct f_descriptor *fd_list[MAX_PPOLL_FDS];
+    struct f_description *fd_list[MAX_PPOLL_FDS];
     struct event *events[MAX_PPOLL_FDS];
     struct timer *timer = NULL;
 
@@ -576,14 +576,15 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
             continue;
         }
 
-        struct f_descriptor *fd = fd_from_fdnum(proc, pollfd->fd);
-        if (fd == NULL) {
+        struct f_descriptor *_fd = fd_from_fdnum(proc, pollfd->fd);
+        if (_fd == NULL) {
             pollfd->revents = POLLNVAL;
             ret++;
             continue;
         }
+        struct f_description *fd = _fd->description;
 
-        struct resource *res = fd->description->res;
+        struct resource *res = fd->res;
         int status = res->status;
 
         if (((uint16_t)status & pollfd->events) != 0) {
@@ -630,8 +631,8 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
         }
 
         struct pollfd *pollfd = &fds[fd_nums[which]];
-        struct f_descriptor *fd = fd_list[which];
-        struct resource *res = fd->description->res;
+        struct f_description *fd = fd_list[which];
+        struct resource *res = fd->res;
 
         int status = res->status;
         if (((uint16_t)status & pollfd->events) != 0) {
@@ -643,8 +644,7 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
 
 cleanup:
     for (int i = 0; i < fd_count; i++) {
-        //struct f_descriptor *fd = fd_list[i];
-        // unref fds
+        fd_list[i]->refcount--;
     }
 
     if (timer != NULL) {
