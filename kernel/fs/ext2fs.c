@@ -532,7 +532,7 @@ static ssize_t ext2fs_createdirentry(struct ext2fs *fs, struct ext2fs_inode *par
             strncpy(entry->name, name, strlen(name) + 1);
 
             ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
-        
+
             free(buf);
             return 0;
         }
