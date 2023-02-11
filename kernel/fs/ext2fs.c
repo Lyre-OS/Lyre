@@ -44,6 +44,7 @@ struct ext2fs_superblock {
     uint16_t sbbgd;
     uint32_t optionalfts;
     uint32_t reqfts;
+    uint32_t readonlyfts;
     char uuid[16]; // filesystem uuid
     char name[16];
     char lastmountedpath[64]; // last path we had when mounted
@@ -85,6 +86,7 @@ struct ext2fs_direntry {
     uint16_t entsize;
     uint8_t namelen;
     uint8_t dirtype;
+    char name[];
 } __attribute__((packed));
 
 struct ext2fs {
@@ -509,37 +511,54 @@ static ssize_t ext2fs_createdirentry(struct ext2fs *fs, struct ext2fs_inode *par
     uint8_t *buf = alloc(EXT2FS_INODESIZE(parent));
     ext2fs_inoderead(parent, fs, buf, 0, EXT2FS_INODESIZE(parent));
 
-    bool found = false;
+    size_t required = (sizeof(struct ext2fs_direntry) + strlen(name) + 1 + 3) & ~3;
 
-    for (size_t i = 0; i < EXT2FS_INODESIZE(parent);) {
-        struct ext2fs_direntry *entry = (struct ext2fs_direntry *)((uint64_t)buf + i);
+    size_t off;
+    for (off = 0; off < EXT2FS_INODESIZE(parent);) {
+        struct ext2fs_direntry *preventry = (struct ext2fs_direntry *)(buf + off);
 
-        if (found) {
+        size_t contracted = (sizeof(struct ext2fs_direntry) + preventry->namelen + 3) & ~3;
+        size_t available = preventry->entsize - contracted;
+
+        if (available >= required) {
+            preventry->entsize = contracted;
+
+            struct ext2fs_direntry *entry = (struct ext2fs_direntry *)(buf + (off + contracted));
+            memset(entry, 0, sizeof(struct ext2fs_direntry));
             entry->inodeidx = newidx;
-            entry->dirtype = dirtype;
+            entry->entsize = available;
             entry->namelen = strlen(name);
-            entry->entsize = EXT2FS_INODESIZE(parent) - i;
-
-            memcpy((void *)((uint64_t)entry + sizeof(struct ext2fs_direntry)), name, strlen(name));
+            entry->dirtype = dirtype;
+            strncpy(entry->name, name, strlen(name) + 1);
 
             ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
-
+        
             free(buf);
             return 0;
         }
 
-        uint32_t expected = ALIGN_UP(sizeof(struct ext2fs_direntry) + entry->namelen, sizeof(uint32_t));
-        if (entry->entsize != expected) {
-            entry->entsize = expected;
-            i += expected;
-
-            found = true;
-
-            continue;
-        }
-
-        i += entry->entsize;
+        off += preventry->entsize;
     }
+
+    free(buf);
+
+    // resize inode to fit directory entry
+    struct ext2fs_inode inode = { 0 };
+    ext2fs_inodereadentry(&inode, fs, newidx);
+    ext2fs_inodegrow(&inode, fs, newidx, 0, EXT2FS_INODESIZE(parent) + fs->blksize); // expand by one block
+    ext2fs_inodewriteentry(&inode, fs, newidx);
+    buf = alloc(EXT2FS_INODESIZE(parent));
+    ext2fs_inoderead(&inode, fs, buf, 0, EXT2FS_INODESIZE(parent));
+
+    struct ext2fs_direntry *entry = (struct ext2fs_direntry *)(buf + off);
+    memset(entry, 0, sizeof(struct ext2fs_direntry));
+    entry->inodeidx = newidx;
+    entry->entsize = EXT2FS_INODESIZE(&inode) - off;
+    entry->namelen = strlen(name);
+    entry->dirtype = dirtype;
+    strncpy(entry->name, name, strlen(name) + 1);
+
+    ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
 
     free(buf);
 
@@ -551,32 +570,18 @@ static bool ext2fs_removedirentry(struct ext2fs *fs, struct ext2fs_inode *parent
     ext2fs_inoderead(parent, fs, buf, 0, EXT2FS_INODESIZE(parent));
 
     struct ext2fs_direntry *preventry = NULL;
-    for (size_t i = 0; i < EXT2FS_INODESIZE(parent);) {
-        struct ext2fs_direntry *entry = (struct ext2fs_direntry *)((uint64_t)buf + i);
-        if (preventry == NULL) {
-            preventry = entry;
-        }
+    for (size_t off = 0; off < EXT2FS_INODESIZE(parent);) {
+        struct ext2fs_direntry *entry = (struct ext2fs_direntry *)(buf + off);
 
         if (entry->inodeidx == inodeidx) {
-
-            size_t oldentsize = entry->entsize;
-            size_t oldentinode = entry->inodeidx;
-
-            if (preventry == entry) {
-                struct ext2fs_direntry *nextdir = (struct ext2fs_direntry *)((uint64_t)entry + entry->entsize);
-                memmove(entry, nextdir, nextdir->entsize); // move all data from next entry to current entry
-
-                entry->entsize += oldentsize; // grow entry to fill the gap
-            } else {
-                preventry->entsize += oldentsize; // grow entry
-            }
+            preventry->entsize += entry->entsize;
 
             ext2fs_inodewrite(parent, fs, buf, parentidx, 0, EXT2FS_INODESIZE(parent));
 
             struct ext2fs_inode inode = { 0 };
-            ext2fs_inodereadentry(&inode, fs, oldentinode);
+            ext2fs_inodereadentry(&inode, fs, entry->inodeidx);
             inode.hardlinkcnt--; // remove reference (usually the last reference, unless it's been hardlinked)
-            ext2fs_inodewriteentry(&inode, fs, oldentinode);
+            ext2fs_inodewriteentry(&inode, fs, entry->inodeidx);
 
             if (inode.hardlinkcnt <= 0 && deleteinode) {
                 inode.deletedtime = time_realtime.tv_sec; // officially mark as deleted
@@ -611,11 +616,9 @@ static bool ext2fs_removedirentry(struct ext2fs *fs, struct ext2fs_inode *parent
             return true;
         }
 
+        off += entry->entsize;
         preventry = entry;
-        i += entry->entsize;
     }
-
-    free(buf);
 
     return false;
 }
@@ -725,7 +728,7 @@ static bool ext2fs_restruncate(struct resource *_this, struct f_description *des
     if (length > EXT2FS_INODESIZE(&curinode)) {
         ext2fs_inodegrow(&curinode, this->fs, this->stat.st_ino, 0, length); // grow
     } else if (length < EXT2FS_INODESIZE(&curinode)) {
-        // TODO: Free unused blocks
+        // TODO: ext2fs_inodeshrink
     }
 
     EXT2FS_INODESETSIZE(&curinode, length);
@@ -889,14 +892,14 @@ static struct vfs_node *ext2fs_create(struct vfs_filesystem *_this, struct vfs_n
         dotent->entsize = 12;
         dotent->namelen = 1;
         dotent->dirtype = 2;
-        ((char *)((uint64_t)dotent + sizeof(struct ext2fs_direntry)))[0] = '.';
+        dotent->name[0] = '.';
 
         struct ext2fs_direntry *dotdotent = (struct ext2fs_direntry *)((uint64_t)buf + dotent->entsize);
         dotdotent->inodeidx = parent->resource->stat.st_ino;
         dotdotent->entsize = this->blksize - dotent->entsize;
         dotdotent->namelen = 2;
         dotdotent->dirtype = 2;
-        strncpy(((char *)((uint64_t)dotdotent + sizeof(struct ext2fs_direntry))), "..", 2); // only copy the two dots
+        strncpy(dotdotent->name, "..", 2); // only copy the two dots
 
         ext2fs_inodewrite(&inode, this, buf, resource->stat.st_ino, 0, this->blksize); // update directory entries at base
 
@@ -956,7 +959,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         struct ext2fs_direntry *direntry = (struct ext2fs_direntry *)((uint64_t)buf + i);
 
         char *namebuf = alloc(direntry->namelen + 1);
-        memcpy(namebuf, (void *)((uint64_t)direntry + sizeof(struct ext2fs_direntry)), direntry->namelen);
+        strncpy(namebuf, direntry->name, direntry->namelen);
 
         if (direntry->inodeidx == 0) {
             free(namebuf);
@@ -1101,6 +1104,10 @@ static struct vfs_node *ext2fs_mount(struct vfs_node *parent, const char *name, 
 
     if (new_fs->sb.sig != 0xef53) {
         return NULL; // signature is not correct
+    }
+
+    if (new_fs->sb.vermaj < 1) {
+        return NULL; // only supports newer revisions of the filesystem
     }
 
     new_fs->backing = source;
