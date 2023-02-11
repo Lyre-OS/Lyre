@@ -925,7 +925,7 @@ static struct vfs_node *ext2fs_create(struct vfs_filesystem *_this, struct vfs_n
     node->resource = (struct resource *)resource;
     parent->resource->stat.st_nlink = parentinode.hardlinkcnt;
     node->resource->stat.st_nlink = inode.hardlinkcnt;
-    node->resource->refcount = S_ISDIR(mode) ? inode.hardlinkcnt - 1 : inode.hardlinkcnt; // physical references (ignoring initial, these are "virtual" entries)
+    node->resource->refcount = 1; // physical references (ignoring initial, these are "virtual" entries)
     return node;
 fail:
     if (node != NULL) {
@@ -1002,7 +1002,7 @@ static void ext2fs_populate(struct vfs_filesystem *_this, struct vfs_node *node)
         fres->stat.st_ino = direntry->inodeidx;
         fres->stat.st_size = EXT2FS_INODESIZE(&inode);
         fres->stat.st_nlink = inode.hardlinkcnt;
-        fres->refcount = S_ISDIR(mode) ? inode.hardlinkcnt - 1 : inode.hardlinkcnt; // exclude dot entries in directory inode links (our vfs relies on its own implementation)
+        fres->refcount = 1; // exclude dot entries in directory inode links (our vfs relies on its own implementation)
         fres->stat.st_blksize = fs->blksize;
         fres->stat.st_blocks = fres->stat.st_size / fs->blksize;
 
