@@ -48,6 +48,10 @@ syscall_table:
     .quad syscall_new_thread  // 43
     .quad syscall_exit_thread // 44
     .quad syscall_sendmsg     // 45
+    .quad syscall_socketpair  // 46
+    .quad syscall_getsockopt  // 47
+    .quad syscall_setsockopt  // 48
+    .quad syscall_getsockname // 49
 syscall_table_end:
 
 .global syscall_count

@@ -55,7 +55,7 @@ struct timer *timer_new(struct timespec when);
 void timer_arm(struct timer *timer);
 void timer_disarm(struct timer *timer);
 
-void time_msleep(uint32_t ms);
+void time_nsleep(uint64_t ns);
 void time_init(void);
 
 #endif

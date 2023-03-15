@@ -3,6 +3,8 @@
 #include <lib/print.h>
 #include <sched/sched.h>
 
+void net_inlineifhandler(struct net_adapter *adapter, struct net_packet *packet);
+
 static void loopback_transmitpacket(struct net_adapter *device, const void *data, size_t length) {
     struct net_packet *packet = alloc(sizeof(struct net_packet));
     packet->len = length;
@@ -16,6 +18,12 @@ static void loopback_transmitpacket(struct net_adapter *device, const void *data
     event_trigger(&device->packetevent, false);
 }
 
+static void loopback_updateflags(struct net_adapter *device, uint16_t old) {
+    (void)old;
+
+    device->flags |= IFF_RUNNING; // force running
+}
+
 void loopback_init(void) {
     struct net_adapter *dev = resource_create(sizeof(struct net_adapter));
 
@@ -24,7 +32,11 @@ void loopback_init(void) {
     dev->stat.st_rdev = resource_create_dev_id();
     dev->ioctl = net_ifioctl;
 
+    dev->hwmtu = 0;
+    dev->flags |= IFF_LOOPBACK | IFF_RUNNING;
+
     dev->txpacket = loopback_transmitpacket;
+    dev->updateflags = loopback_updateflags;
 
     dev->type = NET_ADAPTERETH | NET_ADAPTERLO; // Ethernet-based Loopback device
     net_register((struct net_adapter *)dev);

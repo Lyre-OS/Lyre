@@ -1,6 +1,9 @@
 #include <dev/net/loopback.h>
 #include <dev/net/net.h>
+#include <fs/devtmpfs.h>
+#include <fs/vfs/vfs.h>
 #include <ipc/socket.h>
+#include <ipc/socket/tcp.h>
 #include <ipc/socket/udp.h>
 #include <lib/bitmap.h>
 #include <lib/errno.h>
@@ -9,6 +12,7 @@
 #include <lib/print.h>
 #include <linux/sockios.h>
 #include <net/if.h>
+#include <linux/route.h>
 #include <netinet/in.h>
 #include <printf/printf.h>
 #include <sched/sched.h>
@@ -33,7 +37,7 @@ be_uint16_t net_checksum(void *data, size_t length) {
     }
 
     be_uint16_t ret;
-    ret.value = ~csum;
+    ret = ~csum;
     return ret;
 }
 
@@ -130,37 +134,78 @@ void net_unbindall(struct net_adapter *adapter) {
     spinlock_release(&adapter->socklock);
 }
 
-ssize_t net_sendinet(struct net_adapter *adapter, struct net_inetaddr src, struct net_inetaddr dest, uint8_t protocol, void *data, size_t length) {
-    if (length > adapter->mtu - sizeof(struct net_etherframe) - sizeof(struct net_inetheader)) {
-        errno = -EMSGSIZE;
-        return -1;
-    }
+static void net_fragment(struct net_adapter *adapter, void *buffer, size_t length) {
+    struct net_inetheader *originalinetheader = (struct net_inetheader *)(buffer + NET_LINKLAYERFRAMESIZE(adapter));
+    struct net_inetheader *inetheader = originalinetheader;
+    size_t mtu = adapter->mtu;
 
-    uint8_t *buffer = alloc(sizeof(struct net_etherframe) + sizeof(struct net_inetheader) + length); // since ICMP is variable size
-    struct net_etherframe *frame = (struct net_etherframe *)buffer;
-    frame->type.value = __builtin_bswap16(NET_ETHPROTOIPV4); // IPv4
-    frame->src = adapter->mac;
+    uint16_t tmp = __builtin_bswap16(inetheader->fragoff);
+    uint16_t fragoff = tmp & NET_IPOFFMASK;
+    uint16_t mf = tmp & NET_IPFLAGMF;
+    uint16_t left = length - sizeof(struct net_inetheader) - NET_LINKLAYERFRAMESIZE(adapter);
+    bool last = false;
+    uint16_t poff = NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader);
+    uint16_t nfb = (mtu - sizeof(struct net_inetheader) - NET_LINKLAYERFRAMESIZE(adapter)) / 8;
 
-    if (dest.value == INADDR_BROADCAST) {
-        frame->dest = (struct net_macaddr) { .mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
-    } else {
-        ssize_t status = net_route(&adapter, src, dest, &frame->dest);
-        if (status != 0) {
-            return status;
+    while (left) {
+        last = (left <= mtu - sizeof(struct net_inetheader) - NET_LINKLAYERFRAMESIZE(adapter));
+
+        tmp = mf | (NET_IPOFFMASK & (fragoff));
+        if (!last) {
+            tmp = tmp | NET_IPFLAGMF;
         }
+
+        uint16_t cop = last ? left : nfb * 8; // if it's the last fragment, simply dump the rest of the data, otherwise dump the mtu size
+
+        uint8_t *buf = alloc(NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + cop);
+        memcpy(buf, buffer, NET_LINKLAYERFRAMESIZE(adapter)); // copy link layer
+        memcpy(buf + NET_LINKLAYERFRAMESIZE(adapter), inetheader, sizeof(struct net_inetheader)); // copy ip header to next part in buffer
+        inetheader = (struct net_inetheader *)(buf + NET_LINKLAYERFRAMESIZE(adapter));
+        memcpy(inetheader->data, buffer + poff, cop);
+        poff += cop; // since we're only using poff to figure out what point in the input data buffer we'll grab this data, it's preferrable to do this
+
+        inetheader->fragoff = __builtin_bswap16(tmp);
+        inetheader->len = __builtin_bswap16(cop + sizeof(struct net_inetheader));
+        inetheader->csum = 0;
+        inetheader->csum = net_checksum(inetheader, sizeof(struct net_inetheader));
+
+        adapter->txpacket(adapter, buf, NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + cop);
+        free(buf);
+
+        left -= cop;
+        fragoff += nfb;
     }
 
-    struct net_inetheader *ipheader = (struct net_inetheader *)frame->data;
-    memset(ipheader, 0, sizeof(struct net_inetheader));
+}
+
+ssize_t net_sendinet(struct net_adapter *adapter, struct net_inetaddr src, struct net_inetaddr dest, uint8_t protocol, void *data, size_t length) {
+    uint8_t *buffer = alloc(NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + length); // since ICMP is variable size
+    struct net_inetheader *ipheader = NULL;
+    if (adapter->type & NET_ADAPTERETH) {
+        struct net_etherframe *frame = (struct net_etherframe *)buffer;
+        frame->type = __builtin_bswap16(NET_ETHPROTOIPV4); // IPv4
+        frame->src = adapter->mac;
+
+        if (dest.value == INADDR_BROADCAST) {
+            frame->dest = NET_MACSTRUCT(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+        } else {
+            ssize_t status = net_route(&adapter, src, dest, &frame->dest);
+            if (status != 0) {
+                free(buffer);
+                return status;
+            }
+        }
+        ipheader = (struct net_inetheader *)frame->data;
+    }
 
     ipheader->ihl = 5;
     ipheader->version = 4; // IPv4
-    ipheader->len.value = __builtin_bswap16(sizeof(struct net_inetheader) + length);
-    ipheader->flags = 0;
+    ipheader->len = __builtin_bswap16(sizeof(struct net_inetheader) + length);
+    ipheader->fragoff = 0;
     ipheader->ttl = 64;
-    ipheader->id.value = __builtin_bswap16(adapter->ipframe++);
+    ipheader->id = __builtin_bswap16(adapter->ipframe++);
     ipheader->protocol = protocol;
-    ipheader->csum.value = 0;
+    ipheader->csum = 0;
     ipheader->dest = dest; // reply destination
     ipheader->src = adapter->ip;
 
@@ -168,18 +213,35 @@ ssize_t net_sendinet(struct net_adapter *adapter, struct net_inetaddr src, struc
 
     memcpy(ipheader->data, data, length);
 
-    adapter->txpacket(adapter, buffer, sizeof(struct net_etherframe) + sizeof(struct net_inetheader) + length);
+    if (net_findadapterbyip(dest) == NULL) { // not an interface we have
+        if (adapter->mtu && (NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + length > adapter->mtu)) {
+            net_fragment(adapter, buffer, NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + length);
+            free(buffer);
+            return 0;
+        }
+
+        adapter->txpacket(adapter, buffer, NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + length);
+        free(buffer);
+    } else { // if it's an interface we have access to, just feed the packet right into it as if it were a loopback device (we also do not have to care about MTU)
+        struct net_adapter *a = net_findadapterbyip(dest);
+        struct net_packet *packet = alloc(sizeof(struct net_packet));
+        packet->len = NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_inetheader) + length;
+        packet->data = alloc(packet->len);
+        memcpy(packet->data, buffer, packet->len);
+        free(buffer);
+
+        // feed right back into this adapter
+        spinlock_acquire(&a->cachelock);
+        VECTOR_PUSH_BACK(&a->cache, packet);
+        spinlock_release(&a->cachelock);
+        event_trigger(&a->packetevent, false);
+    }
     return 0;
 }
 
 ssize_t net_lookup(struct net_adapter *adapter, struct net_inetaddr ip, struct net_macaddr *mac) {
-    if (ip.value == NET_IPSTRUCT(NET_IP(127, 0, 0, 1)).value) { // loopback address
-        *mac = NET_MACSTRUCT(0, 0, 0, 0, 0, 0); // simply just set a blank MAC and skip (since lookups are not good for us)
-        return 0;
-    }
-
     struct net_adapter *a = NULL;
-    if ((a = net_findadapterbyip(ip))) { // check if it's a local address, in which case we can skip this step entirely
+    if ((a = net_findadapterbyip(ip))) { // check if it's an address already assigned to one of our adapters, in which case we can skip this step entirely
         *mac = a->mac;
         return 0;
     }
@@ -188,28 +250,31 @@ ssize_t net_lookup(struct net_adapter *adapter, struct net_inetaddr ip, struct n
         return 0;
     }
 
-    uint8_t *buffer = alloc(sizeof(struct net_etherframe) + sizeof(struct net_arpheader));
+    uint8_t *buffer = alloc(NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_arpheader));
+    struct net_arpheader *arp = NULL;
+    if (adapter->type & NET_ADAPTERETH) {
+        struct net_etherframe *frame = (struct net_etherframe *)buffer;
+        frame->type = __builtin_bswap16(NET_ETHPROTOARP);
+        frame->src = adapter->mac;
+        frame->dest = NET_MACSTRUCT(0xff, 0xff, 0xff, 0xff, 0xff, 0xff); // broadcast request
 
-    struct net_etherframe *frame = (struct net_etherframe *)buffer;
-    frame->type.value = __builtin_bswap16(NET_ETHPROTOARP);
-    frame->src = adapter->mac;
-    frame->dest = (struct net_macaddr) { .mac = { 0xff, 0xff, 0xff, 0xff, 0xff } }; // broadcast request
+        arp = (struct net_arpheader *)frame->data;
+        arp->desthw = frame->dest;
+        arp->srchw = frame->src;
+    }
 
-    struct net_arpheader *arp = (struct net_arpheader *)frame->data;
-
-    arp->desthw = frame->dest; // same thing, so copy
-    arp->srchw = frame->src; // ditto
     arp->hwlen = 6;
-    arp->hwtype.value = __builtin_bswap16(adapter->type);
+    arp->hwtype = __builtin_bswap16(adapter->type);
 
     arp->destpr = ip;
     arp->srcpr = adapter->ip;
     arp->plen = 4;
-    arp->prtype.value = __builtin_bswap16(NET_ETHPROTOIPV4); // IPv4
+    arp->prtype = __builtin_bswap16(NET_ETHPROTOIPV4); // IPv4
 
-    arp->opcode.value = __builtin_bswap16(1); // request
+    arp->opcode = __builtin_bswap16(1); // request
 
-    adapter->txpacket(adapter, buffer, sizeof(struct net_etherframe) + sizeof(struct net_arpheader));
+    adapter->txpacket(adapter, buffer, NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_arpheader));
+    free(buffer);
     if (net_findcache(adapter, ip)) {
         goto skipcase; // in case we (impossibly) manage to get an instant response handle it
     }
@@ -221,7 +286,7 @@ ssize_t net_lookup(struct net_adapter *adapter, struct net_inetaddr ip, struct n
             break;
         }
         timeout--;
-        time_msleep(10);
+        time_nsleep(10 * 1000000);
     }
 
     if (!net_findcache(adapter, ip)) {
@@ -264,7 +329,6 @@ ssize_t net_route(struct net_adapter **adapter, struct net_inetaddr local, struc
     }
 
     if (!(*adapter)) {
-        debug_print(0, "net: Route failed to find any adapters %d.%d.%d.%d->%d.%d.%d.%d\n", NET_PRINTIP(local), NET_PRINTIP(remote));
         errno = ENETUNREACH;
         return -1;
     }
@@ -292,31 +356,97 @@ static void net_onicmp(struct net_adapter *adapter, struct net_inetheader *ineth
 
     struct net_icmpheader *header = (struct net_icmpheader *)inetheader->data;
     // XXX: Checksum validation
-    debug_print(0, "net: Received ICMP packet, type: %d, code: %d\n", header->type, header->code);
     if (header->type == 8) { // echo request
-        uint8_t *buffer = alloc(sizeof(struct net_etherframe) + sizeof(struct net_inetheader) + length); // since ICMP is variable size
-        struct net_etherframe *frame = (struct net_etherframe *)buffer;
-        frame->type.value = __builtin_bswap16(NET_ETHPROTOIPV4); // IPv4
-        frame->src = adapter->mac;
-
-        if (inetheader->src.value == INADDR_BROADCAST) {
-            frame->dest = (struct net_macaddr) { .mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } };
-        } else {
-            ssize_t status = net_route(&adapter, adapter->ip, inetheader->src, &frame->dest);
-            if (status != 0) {
-                return;
-            }
-        }
-
         struct net_icmpheader *icmpreply = alloc(length);
         icmpreply->type = 0; // echo reply
         icmpreply->code = 0;
-        icmpreply->csum.value = 0;
+        icmpreply->csum = 0;
         memcpy(icmpreply->data, header->data, length - sizeof(struct net_icmpheader));
         icmpreply->csum = net_checksum(icmpreply, length);
 
-        debug_print(0, "net: Sending ICMP ping reply to %d.%d.%d.%d (%02x:%02x:%02x:%02x:%02x:%02x)\n", NET_PRINTIP(inetheader->src), NET_PRINTMAC(frame->dest));
-        net_sendinet(adapter, adapter->ip, inetheader->src, NET_IPPROTOICMP, icmpreply, length);
+        net_sendinet(adapter, adapter->ip, inetheader->src, IPPROTO_ICMP, icmpreply, length);
+        free(icmpreply);
+    }
+}
+
+
+struct net_reassmetadata {
+    // used to identify specifically against a fragment
+    uint8_t timer; // timer until reassembly failure
+    void *data; // data thus far (received data we've gotten)
+    uint16_t len; // length of data
+    struct net_inetheader header;
+};
+
+static VECTOR_TYPE(struct net_reassmetadata *) net_reassemblemeta = VECTOR_INIT;
+
+static struct net_inetheader *net_reassemble(struct net_inetheader *header) {
+    if (header->ihl * 4 > sizeof(struct net_inetheader)) { // unimplemented for options
+        return NULL;
+    }
+
+    struct net_reassmetadata *metadata = NULL;
+    VECTOR_FOR_EACH(&net_reassemblemeta, it,
+        struct net_reassmetadata *m = *it;
+        if (m->header.id == header->id &&
+            m->header.src.value == header->src.value &&
+            m->header.dest.value == header->dest.value) {
+            metadata = m;
+        }
+    );
+
+    if (metadata == NULL) { // we have not already started working on this fragment
+        if ((__builtin_bswap16(header->fragoff) & NET_IPOFFMASK) * 8 != 0) { // ensure this is the first fragment
+            return NULL; // do not accept any new fragments that are not the initial fragment for this packet
+        }
+        metadata = alloc(sizeof(struct net_reassmetadata));
+        metadata->data = alloc(__builtin_bswap16(header->len)); // allocate initial data
+        memcpy(&metadata->header, header, sizeof(struct net_inetheader));
+        metadata->timer = 3; // maximum age
+        VECTOR_PUSH_BACK(&net_reassemblemeta, metadata);
+    }
+
+    uint16_t fragoff = (__builtin_bswap16(header->fragoff) & NET_IPOFFMASK) * 8;
+    uint16_t len = __builtin_bswap16(header->len) - sizeof(struct net_inetheader);
+    metadata->len += len;
+
+    metadata->data = realloc(metadata->data, metadata->len);
+    memcpy(metadata->data + fragoff, header->data, len);
+
+    if ((header->fragoff & __builtin_bswap16(NET_IPFLAGMF)) == 0) { // this is the final fragment
+        struct net_inetheader *fraghdr = alloc(sizeof(struct net_inetheader) + metadata->len);
+        memcpy(fraghdr, &metadata->header, sizeof(struct net_inetheader));
+        fraghdr->fragoff = 0; // clear flags on header
+        fraghdr->len = __builtin_bswap16(sizeof(struct net_inetheader) + metadata->len);
+        fraghdr->csum = 0;
+        fraghdr->csum = net_checksum(fraghdr, sizeof(struct net_inetheader));
+        memcpy(fraghdr->data, metadata->data, metadata->len);
+        VECTOR_REMOVE_BY_VALUE(&net_reassemblemeta, metadata);
+        free(metadata->data);
+        free(metadata);
+        return fraghdr;
+    }
+
+    return NULL; // not ready yet
+}
+
+static void net_fraghandler(void *unused) {
+    (void)unused;
+
+    for (;;) {
+        time_nsleep(1000 * 1000000); // sleep 1000ms
+
+        VECTOR_FOR_EACH(&net_reassemblemeta, it,
+            struct net_reassmetadata *meta = *it;
+
+            meta->timer--;
+            if (meta->timer == 0) {
+                VECTOR_REMOVE_BY_VALUE(&net_reassemblemeta, meta);
+                debug_print(0, "net: Timed out on fragment reassembly (packet id: %d)\n", __builtin_bswap16(meta->header.id));
+                free(meta->data);
+                free(meta);
+            }
+        );
     }
 }
 
@@ -335,20 +465,42 @@ static void net_oninet(struct net_adapter *adapter, void *data, size_t length) {
 
     be_uint16_t csum = header->csum;
 
-    header->csum.value = 0; // exclude checksum from calculation
-    if (csum.value != net_checksum(data, sizeof(struct net_inetheader)).value) {
+    header->csum = 0; // exclude checksum from calculation
+    if (csum != net_checksum(data, sizeof(struct net_inetheader))) {
         debug_print(0, "net: Invalid checksum on IPv4 packet\n");
         return;
     }
 
+    if (header->fragoff & __builtin_bswap16(NET_IPFLAGMF | NET_IPOFFMASK)) { // if a packet has the more fragements flag set and/or a fragment offset, assume it's part of a fragmented packet
+        header = net_reassemble(header);
+        if (header == NULL) {
+            return; // reassembly failed/not complete, drop packet from here (reassembly works by grouping the packets as we get them, combining them together until they form a full packet)
+        }
+    }
+
+    length = __builtin_bswap16(header->len); // update length to reflect actual length of this packet (some hardware drivers will not reflect the true length of the packet)
+
     switch (header->protocol) {
-        case NET_IPPROTOICMP: // ICMP
+        case IPPROTO_ICMP: // ICMP
             net_onicmp(adapter, header, length - sizeof(struct net_inetheader));
             break;
-        case NET_IPPROTOTCP: // TCP
+        case IPPROTO_TCP: // TCP
+            tcp_ontcp(adapter, header, length - sizeof(struct net_inetheader));
             break;
-        case NET_IPPROTOUDP: // UDP
+        case IPPROTO_UDP: // UDP
             udp_onudp(adapter, header, length - sizeof(struct net_inetheader));
+            break;
+        default:
+            struct net_icmpheader *icmpreply = alloc(sizeof(struct net_icmpheader) + sizeof(struct net_inetheader) + __builtin_bswap16(header->len));
+            icmpreply->type = 3; // unreachable
+            icmpreply->code = 2; // protocol
+            icmpreply->csum = 0;
+            memcpy(icmpreply->data, header, sizeof(struct net_inetheader));
+            memcpy(icmpreply->data + sizeof(struct net_inetheader), header->data, __builtin_bswap16(header->len));
+            icmpreply->csum = net_checksum(icmpreply, sizeof(struct net_icmpheader) + sizeof(struct net_inetheader) + __builtin_bswap16(header->len));
+
+            net_sendinet(adapter, adapter->ip, header->src, IPPROTO_ICMP, icmpreply, length);
+            free(icmpreply);
             break;
     }
 }
@@ -361,33 +513,34 @@ static void net_onarp(struct net_adapter *adapter, void *data, size_t length) {
 
     struct net_arpheader *header = (struct net_arpheader *)data;
 
-    if (__builtin_bswap16(header->opcode.value) == 0x01) { // request
+    if (__builtin_bswap16(header->opcode) == 0x01) { // request
         struct net_adapter *arpadapter = net_findadapterbyip(header->destpr);
 
         if (arpadapter) {
-            debug_print(0, "net: ARP request for %d.%d.%d.%d from %d.%d.%d.%d, it is local adapter %s with %02x:%02x:%02x:%02x:%02x:%02x\n", NET_PRINTIP(header->destpr), NET_PRINTIP(header->srcpr), arpadapter->ifname, NET_PRINTMAC(arpadapter->mac));
+            uint8_t *buffer = alloc(NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_arpheader));
+            struct net_arpheader *reply = NULL;
+            if (adapter->type & NET_ADAPTERETH) {
+                struct net_etherframe *ethframe = (struct net_etherframe *)buffer;
+                ethframe->type = __builtin_bswap16(NET_ETHPROTOARP); // ARP
+                ethframe->src = arpadapter->mac;
+                ethframe->dest = header->srchw;
 
-            uint8_t *buffer = alloc(sizeof(struct net_etherframe) + sizeof(struct net_arpheader));
-            struct net_etherframe *ethframe = (struct net_etherframe *)buffer;
-            ethframe->type.value = __builtin_bswap16(NET_ETHPROTOARP); // ARP
-            ethframe->src = arpadapter->mac;
-            ethframe->dest = header->srchw;
-
-            struct net_arpheader *reply = (struct net_arpheader *)ethframe->data;
+                reply = (struct net_arpheader *)ethframe->data;
+            }
 
             reply->desthw = header->srchw;
             reply->srchw = arpadapter->mac;
             reply->hwlen = 6;
-            reply->hwtype.value = __builtin_bswap16(arpadapter->type);
+            reply->hwtype = __builtin_bswap16(arpadapter->type);
 
             reply->destpr = header->srcpr;
             reply->srcpr = arpadapter->ip;
             reply->plen = 4;
-            reply->prtype.value = __builtin_bswap16(NET_ETHPROTOIPV4);
+            reply->prtype = __builtin_bswap16(NET_ETHPROTOIPV4);
 
-            reply->opcode.value = __builtin_bswap16(2); // reply
+            reply->opcode = __builtin_bswap16(2); // reply
 
-            arpadapter->txpacket(arpadapter, buffer, sizeof(struct net_etherframe) + sizeof(struct net_arpheader)); // reply should come from the adapter in question rather than the one that picked up the packet
+            arpadapter->txpacket(arpadapter, buffer, NET_LINKLAYERFRAMESIZE(adapter) + sizeof(struct net_arpheader)); // reply should come from the adapter in question rather than the one that picked up the packet
             free(buffer);
         }
     }
@@ -404,69 +557,188 @@ static noreturn void net_ifhandler(struct net_adapter *adapter) {
     debug_print(0, "net: Interface thread initialised on %s\n", adapter->ifname);
 
     for (;;) {
-        struct event *events[] = { &adapter->packetevent };
-        event_await(events, 1, true);
+        while (adapter->cache.length == 0) {
+            struct event *events[] = { &adapter->packetevent };
+            event_await(events, 1, true);
+        }
 
-        spinlock_acquire(&adapter->cachelock); // lock our usage of the cache to prevent changing the contents of the cache between reads
-
+        spinlock_acquire(&adapter->cachelock);
         struct net_packet *packet = VECTOR_ITEM(&adapter->cache, 0); // grab latest
 
         struct net_etherframe *ethframe = NULL; // ethernet frame (in case of ethernet)
         if (adapter->type & NET_ADAPTERETH) { // ethernet
             ethframe = (struct net_etherframe *)packet->data;
-            debug_print(0, "net: Ethernet packet of type %x sent to %02x:%02x:%02x:%02x:%02x:%02x from %02x:%02x:%02x:%02x:%02x:%02x on %s\n", __builtin_bswap16(ethframe->type.value), NET_PRINTMAC(ethframe->dest), NET_PRINTMAC(ethframe->src), adapter->ifname);
         }
         VECTOR_REMOVE(&adapter->cache, 0); // remove from cache to give us more space
-
         spinlock_release(&adapter->cachelock);
 
         if (adapter->type & NET_ADAPTERETH) { // ethernet
-            switch (__builtin_bswap16(ethframe->type.value)) {
+            switch (__builtin_bswap16(ethframe->type)) {
                 case NET_ETHPROTOIPV4: // IPv4
                     net_oninet(adapter, ethframe->data, packet->len - sizeof(struct net_etherframe));
                     free(packet);
+                    free(packet->data);
                     break;
                 case NET_ETHPROTOARP: // ARP
                     net_onarp(adapter, ethframe->data, packet->len - sizeof(struct net_etherframe));
                     free(packet);
+                    free(packet->data);
+                    break;
+                default:
+                    free(packet);
+                    free(packet->data);
                     break;
             }
         }
     }
 }
 
-// Socket ioctl() for inet sockets to call upon their adapter
-int net_sockioctl(struct resource *_this, struct f_description *description, uint64_t request, uint64_t arg) {
-    struct inetsocket *this = (struct inetsocket *)_this;
-
-    if (this->adapter) { // only if the adapter exists will this be passed onwards (interface binding explicitly/binded directly to an adapter)
-        return net_ifioctl((struct resource *)this->adapter, description, request, arg); // pass all interface ioctls to if ioctl
-    }
-    return resource_default_ioctl(_this, description, request, arg);
-}
-
-
 // Direct ioctl() on adapter (from something like the device or via the socket)
 int net_ifioctl(struct resource *_this, struct f_description *description, uint64_t request, uint64_t arg) {
-    struct net_adapter *this = (struct net_adapter *)_this;
+    struct ifreq *req = (struct ifreq *)arg;
+    if (req->ifr_ifru.ifru_ivalue) {
+        if (request == SIOCGIFNAME) { // this one relies on the index instead of the name
+            struct net_adapter *this = NULL; // adapter in question
+            VECTOR_FOR_EACH(&net_adapters, it,
+                struct net_adapter *a = *it;
+                if (a->index == req->ifr_ifru.ifru_ivalue) {
+                    this = a;
+                }
+            );
+
+            if (this == NULL) {
+                // XXX: Should there be an errno?
+                errno = ENODEV;
+                return -1;
+            }
+
+            strncpy(req->ifr_ifrn.ifrn_name, this->ifname, IFNAMSIZ);
+            return 0;
+        }
+    }
+
+    struct net_adapter *this = NULL; // adapter in question
+    switch (request) {
+        case SIOCADDRT: {
+            struct rtentry *route = (struct rtentry *)arg;
+            VECTOR_FOR_EACH(&net_adapters, it,
+                struct net_adapter *a = *it;
+                if (!strncmp(a->ifname, route->rt_dev, IFNAMSIZ)) {
+                    this = a;
+                }
+            );
+
+            if (this == NULL) {
+                VECTOR_FOR_EACH(&net_adapters, it,
+                    struct net_adapter *a = *it;
+                    if (a->index == req->ifr_ifru.ifru_ivalue) {
+                        this = a;
+                    }
+                );
+
+                if (this == NULL) {
+                    // XXX: Should there be an errno?
+                    errno = ENODEV;
+                    return -1;
+                }
+            }
+            break;
+        }
+        default: {
+            VECTOR_FOR_EACH(&net_adapters, it,
+                struct net_adapter *a = *it;
+                if (!strncmp(a->ifname, req->ifr_ifrn.ifrn_name, IFNAMSIZ)) {
+                    this = a;
+                }
+            );
+
+            if (this == NULL) {
+                VECTOR_FOR_EACH(&net_adapters, it, // if there is no matching interface name, try match based on interface index
+                    struct net_adapter *a = *it;
+                    if (a->index == req->ifr_ifru.ifru_ivalue) {
+                        this = a;
+                    }
+                );
+
+                if (this == NULL) {
+                    // XXX: Should there be an errno?
+                    errno = ENODEV;
+                    return -1;
+                }
+            }
+
+        }
+    }
 
     switch (request) {
         case SIOCADDRT: {
+            // XXX: Properly figure out route tables instead of simply just setting the gateway
+            struct rtentry *route = (struct rtentry *)arg;
+            if (route->rt_flags & RTF_GATEWAY && route->rt_flags & RTF_UP) {
+                struct sockaddr_in *addr = (struct sockaddr_in *)&route->rt_gateway;
+                if (addr->sin_family != AF_INET) {
+                    errno = ENOPROTOOPT;
+                    return -1;
+                }
+
+                this->gateway.value = addr->sin_addr.s_addr;
+
+                struct net_macaddr mac = { 0 };
+                net_lookup(this, this->gateway, &mac); // force lookup
+                return 0;
+            }
+            errno = EINVAL;
+            return -1;
+        }
+        case SIOCGIFFLAGS: {
+            req->ifr_ifru.ifru_flags = this->flags;
             return 0;
         }
-        case SIOCGIFNAME: {
-            strcpy(((struct ifreq *)arg)->ifr_name, this->ifname);
+        case SIOCSIFFLAGS: {
+            uint16_t old = this->flags;
+            this->flags = req->ifr_ifru.ifru_flags;
+            this->updateflags(this, old); // update for flags
+            return 0;
+        }
+        case SIOCSIFNAME: {
+            char devpath[32];
+            snprintf(devpath, 32, "/dev/%s", this->ifname);
+            vfs_unlink(vfs_root, devpath); // unlink original
+            strncpy(this->ifname, req->ifr_newname, IFNAMSIZ);
+            devtmpfs_add_device((struct resource *)this, this->ifname); // add new one
+            return 0;
+        }
+        case SIOCGIFMTU: {
+            req->ifr_ifru.ifru_mtu = this->mtu;
+            return 0;
+        }
+        case SIOCSIFMTU: {
+            if (this->hwmtu) {
+                if (this->mtu > this->hwmtu) {
+                    errno = EINVAL;
+                    return -1; // MTU is over the maximum the hardware can handle
+                }
+
+                if (req->ifr_ifru.ifru_mtu) {
+                    this->mtu = req->ifr_ifru.ifru_mtu; // will only set to the requested MTU if it's not zero
+                } else {
+                    errno = EINVAL;
+                    return -1;
+                }
+            } else {
+                this->mtu = req->ifr_ifru.ifru_mtu; // will set to whatever the dynamic MTU adapter can handle
+            }
             return 0;
         }
         case SIOCGIFADDR: {
-            struct sockaddr_in *inaddr = (struct sockaddr_in *)&((struct ifreq *)arg)->ifr_addr;
-            inaddr->sin_family = PF_INET;
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_addr;
+            inaddr->sin_family = AF_INET;
             inaddr->sin_addr.s_addr = this->ip.value;
             return 0;
         }
         case SIOCSIFADDR: {
-            struct sockaddr_in *inaddr = (struct sockaddr_in *)&((struct ifreq *)arg)->ifr_addr;
-            if (inaddr->sin_family != PF_INET) {
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_addr;
+            if (inaddr->sin_family != AF_INET) {
                 errno = EPROTONOSUPPORT;
                 return -1;
             }
@@ -475,15 +747,15 @@ int net_ifioctl(struct resource *_this, struct f_description *description, uint6
             return 0;
         }
         case SIOCGIFNETMASK: {
-            struct sockaddr_in *inaddr = (struct sockaddr_in *)&((struct ifreq *)arg)->ifr_netmask;
-            inaddr->sin_family = PF_INET;
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_netmask;
+            inaddr->sin_family = AF_INET;
             inaddr->sin_addr.s_addr = this->subnetmask.value;
             return 0;
         }
         case SIOCSIFNETMASK: {
-            struct sockaddr_in *inaddr = (struct sockaddr_in *)&((struct ifreq *)arg)->ifr_netmask;
-            
-            if (inaddr->sin_family != PF_INET) {
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_netmask;
+
+            if (inaddr->sin_family != AF_INET) {
                 errno = EPROTONOSUPPORT;
                 return -1;
             }
@@ -492,36 +764,98 @@ int net_ifioctl(struct resource *_this, struct f_description *description, uint6
             return 0;
         }
         case SIOCGIFHWADDR: {
-            memcpy(((struct ifreq *)arg)->ifr_hwaddr.sa_data, this->mac.mac, sizeof(struct net_macaddr));
+            memcpy(req->ifr_hwaddr.sa_data, this->mac.mac, sizeof(struct net_macaddr));
             return 0;
         }
         case SIOCGIFINDEX: {
-            ((struct ifreq *)arg)->ifr_ifindex = this->index;
+            req->ifr_ifru.ifru_ivalue = this->index;
             return 0;
         }
-    };
+    }
 
     return resource_default_ioctl(_this, description, request, arg);
 }
 
-void net_register(struct net_adapter *adapter) { 
-    adapter->ifname = alloc(32);
+ssize_t net_getsockopt(struct socket *_this, struct f_description *description, int level, int optname, void *optval, socklen_t *optlen) {
+    (void)description;
+    (void)level;
 
-    if (adapter->type & NET_ADAPTERLO) {
-        strcpy(adapter->ifname, "lo");
-    } else if (adapter->type & NET_ADAPTERETH) {
-        snprintf(adapter->ifname, 32, "eth%d", net_ethcount++);
+    if (_this->family != AF_INET) {
+        errno = EINVAL;
+        return -1;
     }
 
-    adapter->mtu = 1500; // this can be changed!
-    adapter->index = net_adapters.length - 1; 
+    switch (optname) {
+        case SO_ACCEPTCONN:
+            if (_this->protocol != IPPROTO_TCP) {
+                break;
+            }
+            *((bool *)optval) = _this->state == SOCKET_LISTENING;
+            *optlen = sizeof(bool);
+            return 0;
+        case SO_BINDTODEVICE:
+            size_t len = *optlen;
+            strncpy(optval, ((struct inetsocket *)_this)->adapter->ifname, len);
+            return 0;
+        case SO_BROADCAST:
+            *((bool *)optval) = ((struct inetsocket *)_this)->canbroadcast;
+            return 0;
+    }
+
+    errno = EINVAL;
+    return -1;
+}
+
+ssize_t net_setsockopt(struct socket *_this, struct f_description *description, int level, int optname, const void *optval, socklen_t optlen) {
+    (void)description;
+    (void)level;
+
+    if (_this->family != AF_INET) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    switch (optname) {
+        case SO_BROADCAST: {
+            ((struct inetsocket *)_this)->canbroadcast = *((bool *)optval);
+            break;
+        }
+        case SO_BINDTODEVICE: {
+            const char *ifname = (const char *)optval;
+            VECTOR_FOR_EACH(&net_adapters, it,
+                struct net_adapter *adapter = *it;
+                if (!strncmp(adapter->ifname, ifname, optlen)) {
+                    net_bindsocket(adapter, _this);
+                    return 0;
+                }
+            );
+            break;
+        }
+        case SO_DONTROUTE:
+            // XXX: Prevent routing to gateway on IP level
+            ((struct inetsocket *)_this)->canroute = *((bool *)optval);
+            return 0;
+    }
+    errno = EINVAL;
+    return 0;
+}
+
+void net_register(struct net_adapter *adapter) {
+    if (adapter->type & NET_ADAPTERLO) {
+        adapter->mtu = 0; // loopback interfaces do not care about MTU
+        strcpy(adapter->ifname, "lo");
+    } else if (adapter->type & NET_ADAPTERETH) {
+        adapter->mtu = 1500; // this can be changed!
+        snprintf(adapter->ifname, IFNAMSIZ, "eth%d", net_ethcount++);
+    }
+
+    VECTOR_PUSH_BACK(&net_adapters, adapter);
+    adapter->index = net_adapters.length;
 
     adapter->addrcache = (typeof(adapter->addrcache))VECTOR_INIT;
     adapter->cache = (typeof(adapter->cache))VECTOR_INIT;
     adapter->cachelock = (spinlock_t)SPINLOCK_INIT;
     adapter->addrcachelock = (spinlock_t)SPINLOCK_INIT;
-
-    VECTOR_PUSH_BACK(&net_adapters, adapter);
 
     sched_new_kernel_thread(net_ifhandler, adapter, true);
 }
@@ -529,4 +863,5 @@ void net_register(struct net_adapter *adapter) {
 void net_init(void) {
     net_portbitmap = alloc(NET_PORTRANGEEND - NET_PORTRANGESTART);
     loopback_init();
+    sched_new_kernel_thread(net_fraghandler, NULL, true);
 }

@@ -100,25 +100,23 @@ void timer_handler(void) {
     }
 }
 
-void time_msleep(uint32_t ms) {
-    struct timespec duration = { 0 };
+void time_nsleep(uint64_t ns) {
+    struct timespec duration = { .tv_sec = ns / 1000000000, .tv_nsec = ns };
     struct timer *timer = NULL;
-    struct event *event = NULL;
-
-    if (ms > 999) {
-        duration.tv_sec = ms / 1000;
-        duration.tv_nsec = (uint64_t)((ms - ((ms / 1000) * 1000)) * 1000000);
-    } else {
-        duration.tv_nsec = (uint64_t)(ms * 1000000);
-    }
 
     timer = timer_new(duration);
-    event = &timer->event;
+    if (timer == NULL) {
+        goto cleanup;
+    }
 
-    event_await(&event, 1, true);
+    struct event *events[] = { &timer->event };
+    event_await(events, 1, true);
 
     timer_disarm(timer);
+
     free(timer);
+cleanup:
+    return;
 }
 
 int syscall_sleep(void *_, struct timespec *duration, struct timespec *remaining) {

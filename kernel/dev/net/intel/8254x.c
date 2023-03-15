@@ -105,7 +105,7 @@ struct e8254x_txdesc {
 // GC/EI specific
 #define E8254X_TCTLNRTU (1 << 25)
 
-struct e8254x_device { 
+struct e8254x_device {
     struct net_adapter;
 
     // 8254x specific
@@ -116,7 +116,7 @@ struct e8254x_device {
     uint64_t base;
     uint64_t iobase;
     uint8_t vector;
-    bool io; 
+    bool io;
 };
 
 static void e8254x_writereg(struct e8254x_device *device, uint32_t reg, uint32_t data) {
@@ -194,19 +194,34 @@ static void e8254x_inittx(struct e8254x_device *device) {
 }
 
 static void e8254x_linkupdate(struct e8254x_device *device) {
-    int link = (e8254x_readreg(device, E1000_STATUS) | E8254X_STATUSLU);
+    int link = e8254x_readreg(device, E1000_STATUS) | E8254X_STATUSLU;
 
-    device->linkstate = link;
+    // IFF_RUNNING only defines the operative state of the hardware *not* the administrative state (administrative is completely software)
+    if (link) {
+        device->flags |= IFF_RUNNING;
+    } else {
+        device->flags &= ~IFF_RUNNING;
+    }
+}
+
+static void e8254x_updateflags(struct net_adapter *device, uint16_t old) {
+    if (!(device->flags & IFF_UP) && device->flags & IFF_DYNAMIC) { // interface is down and dynamic (loses interfaces on interface down)
+        memset(&device->ip, 0, sizeof(struct net_inetaddr));
+        memset(&device->gateway, 0, sizeof(struct net_inetaddr));
+        memset(&device->subnetmask, 0, sizeof(struct net_inetaddr));
+    }
+
+    if (old & IFF_RUNNING && !(device->flags & IFF_RUNNING)) {
+        device->flags |= IFF_RUNNING; // disallow change
+    }
 }
 
 static void e8254x_transmitpacket(struct net_adapter *adapter, const void *data, size_t length) {
     struct e8254x_device *device = (struct e8254x_device *)adapter;
     bool old = interrupt_toggle(false);
 
-    bool pageswap = false;
     struct pagemap *pagemap = NULL;
-    if (sched_current_thread() != NULL) {
-        pageswap = true;
+    if (sched_current_thread() != NULL && sched_current_thread()->process->pagemap != vmm_kernel_pagemap) {
         // XXX: Do NOT give up and simply swap pagemaps, as that's simply not a good idea (there might be issues later down the line)
         pagemap = sched_current_thread()->process->pagemap; // store current pagemap
         vmm_switch_to(vmm_kernel_pagemap); // swap to the kernel's pagemap
@@ -215,13 +230,18 @@ static void e8254x_transmitpacket(struct net_adapter *adapter, const void *data,
     struct e8254x_txdesc *desc = &device->txdescs[device->txtail];
     memcpy((void *)(desc->addr), data, length); // copy packet into data
     desc->len = length;
+    // descriptor should be:
+    // - EOP (end of packet)
+    // - IFCS (insert frame check sequence)
+    // - RS (report status)
+    // legacy (no extension) is implict
     desc->cmd = (1 << 0) | (1 << 1) | (1 << 3);
 
     device->txtail = (device->txtail + 1) % 256;
 
     e8254x_writereg(device, E1000_TDT(0), device->txtail);
 
-    if (pageswap) {
+    if (pagemap) {
         vmm_switch_to(pagemap); // swap back to our old pagemap to prevent issues (kernel has access to everything in maps, but this pagemap doesn't)
     }
 
@@ -237,6 +257,7 @@ static noreturn void e8254x_routine(struct e8254x_device *device) {
 
         if (status & E8254X_INTLSC) {
             e8254x_writereg(device, E1000_CTRL, e8254x_readreg(device, E1000_CTRL) | E8254X_CTRLSLU | E8254X_CTRLASDE);
+            time_nsleep(10 * 1000000);
 
             e8254x_linkupdate(device);
         } else if (status & E8254X_INTRXT0) {
@@ -254,7 +275,7 @@ static noreturn void e8254x_routine(struct e8254x_device *device) {
 
                 device->rxdescs[device->rxtail].status = 0; // reset status
 
-                if (device->rxdescs[device->rxtail].len <= device->mtu) {
+                if (device->rxdescs[device->rxtail].len <= device->mtu + NET_LINKLAYERFRAMESIZE(device)) { // MTU excludes link layer frame
                     struct net_packet *packet = alloc(sizeof(struct net_packet));
                     packet->len = device->rxdescs[device->rxtail].len;
                     packet->data = alloc(packet->len);
@@ -285,23 +306,25 @@ static void e8254x_initcontroller(struct pci_device *device) {
     dev->iobase = !pci_get_bar(device, 1).is_mmio ? pci_get_bar(device, 1).base : pci_get_bar(device, 2).base;
 
     e8254x_writereg(dev, E1000_IMC, 0xffffffff);
+    e8254x_writereg(dev, E1000_ICR, 0xffffffff);
+    e8254x_readreg(dev, E1000_STATUS);
 
     e8254x_writereg(dev, E1000_RCTL, 0);
     e8254x_writereg(dev, E1000_TCTL, E8254X_TCTLPSP);
     e8254x_readreg(dev, E1000_STATUS);
 
-    time_msleep(10);
+    time_nsleep(10 * 1000000);
 
     e8254x_writereg(dev, E1000_CTRL, e8254x_readreg(dev, E1000_CTRL) | E8254X_CTRLRST); // reset controller
-    time_msleep(10);
+    time_nsleep(10 * 1000000);
     while (e8254x_readreg(dev, E1000_CTRL) & E8254X_CTRLRST); // wait for bit clear
 
-    e8254x_writereg(dev, E1000_IMC, 0);
-
-    e8254x_readreg(dev, E1000_ICR);
+    e8254x_writereg(dev, E1000_IMC, 0xffffffff);
+    e8254x_writereg(dev, E1000_ICR, 0xffffffff);
+    e8254x_readreg(dev, E1000_STATUS);
 
     bool haseeprom = e8254x_readreg(dev, E1000_EEC) & (1 << 8);
-    time_msleep(10);
+    time_nsleep(10 * 1000000);
     if (!haseeprom) {
         kernel_print("e8254x: No EEPROM exists, giving up\n");
         free(dev);
@@ -325,16 +348,31 @@ static void e8254x_initcontroller(struct pci_device *device) {
     dev->mac.mac[4] = machi & 0xff;
     dev->mac.mac[5] = (machi >> 8) & 0xff;
 
+    dev->permmac = dev->mac; // permanent mac starts initially as this (TODO: allow changing of MAC?)
+
+    dev->hwmtu = 1522;
 
     kernel_print("e8254x: Hardware MAC address for controller: %02x:%02x:%02x:%02x:%02x:%02x\n", NET_PRINTMAC(dev->mac));
 
     e8254x_writereg(dev, E1000_CTRL, e8254x_readreg(dev, E1000_CTRL) | E8254X_CTRLSLU | E8254X_CTRLASDE); // link enable, auto speed negotiation
 
+    for (size_t i = 0; i < 128; i++) {
+        e8254x_writereg(dev, E1000_MTA + i * 4, 0); // multicast table array
+    }
+
+    for (size_t i = 0; i < 64; i++) {
+        e8254x_readreg(dev, E1000_CRCERRS + i * 4);
+    }
+
     e8254x_initrx(dev);
     e8254x_inittx(dev);
 
+    e8254x_writereg(dev, E1000_RDTR, 0); // zero delay on interrupt timer
+    e8254x_writereg(dev, E1000_ITR, 651); // interrupt throttling (initial suggested as of SDM)
+    e8254x_readreg(dev, E1000_STATUS);
+
     e8254x_writereg(dev, E1000_IMS, E8254X_INTTXDW | E8254X_INTTXQE | E8254X_INTLSC | E8254X_INTRXSEQ | E8254X_INTRXT0);
-    e8254x_linkupdate(dev); 
+    e8254x_linkupdate(dev);
 
     dev->can_mmap = false;
     dev->stat.st_mode = 0666 | S_IFCHR;
@@ -342,6 +380,7 @@ static void e8254x_initcontroller(struct pci_device *device) {
     dev->ioctl = net_ifioctl;
 
     dev->txpacket = e8254x_transmitpacket;
+    dev->updateflags = e8254x_updateflags;
 
     dev->type = NET_ADAPTERETH; // ethernet network driver
     net_register((struct net_adapter *)dev);
@@ -349,10 +388,10 @@ static void e8254x_initcontroller(struct pci_device *device) {
     dev->cachelock = (spinlock_t)SPINLOCK_INIT;
 
     // NOTE: Until network configuration is a thing, please just adjust these values to your usage
-    dev->subnetmask = NET_IPSTRUCT(NET_IP(255, 255, 255, 0)); // default subnet mask (XXX: Change to be 255.255.255.255 for no subnet, rely on later configuration to function)
-    dev->gateway = NET_IPSTRUCT(NET_IP(192, 168, 122, 1));
+    // dev->subnetmask = NET_IPSTRUCT(NET_IP(255, 255, 255, 0)); // default subnet mask (XXX: Change to be 255.255.255.255 for no subnet, rely on later configuration to function)
+    // dev->gateway = NET_IPSTRUCT(NET_IP(192, 168, 122, 1));
     // XXX: Use userland network configuration instead!
-    dev->ip = NET_IPSTRUCT(NET_IP(192, 168, 122, 2));
+    // dev->ip = NET_IPSTRUCT(NET_IP(192, 168, 122, 2));
 
     devtmpfs_add_device((struct resource *)dev, dev->ifname);
     sched_new_kernel_thread(e8254x_routine, dev, true);

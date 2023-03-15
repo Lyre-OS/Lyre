@@ -174,7 +174,8 @@ static bool unix_bind(struct socket *this, struct f_description *description, vo
 
     this->stat = node->resource->stat;
     node->resource = (struct resource *)this;
-    memcpy(&this->addr, addr, sizeof(struct sockaddr_un));
+    memcpy(&this->localaddr, addr, sizeof(struct sockaddr_un));
+    this->bound = true;
     return true;
 }
 
@@ -194,6 +195,8 @@ static bool unix_connect(struct socket *_this, struct f_description *description
     if (node == NULL) {
         return false;
     }
+
+    memcpy(&_this->localaddr, addr, sizeof(struct sockaddr_un));
 
     struct socket *sock;
     if (S_ISSOCK(node->resource->stat.st_mode)) {
@@ -244,7 +247,24 @@ static bool unix_getpeername(struct socket *this, struct f_description *descript
         actual_len = sizeof(struct sockaddr_un);
     }
 
-    memcpy(addr, &this->addr, actual_len);
+    memcpy(addr, &this->peeraddr, actual_len);
+    *len = actual_len;
+    return true;
+}
+
+static bool unix_getsockname(struct socket *this, struct f_description *description, void *addr, socklen_t *len) {
+    (void)description;
+
+    if (!this->bound) {
+        return true;
+    }
+
+    size_t actual_len = *len;
+    if (actual_len < sizeof(struct sockaddr_un)) {
+        actual_len = sizeof(struct sockaddr_un);
+    }
+
+    memcpy(addr, &this->localaddr, actual_len);
     *len = actual_len;
     return true;
 }
@@ -265,12 +285,12 @@ static struct socket *unix_accept(struct socket *_this, struct f_description *de
     }
 
     struct sockaddr_un *addr = (struct sockaddr_un *)_addr;
-    *addr = *(struct sockaddr_un *)&other->addr;
+    *addr = *(struct sockaddr_un *)&other->localaddr;
     *len = sizeof(struct sockaddr_un);
 
     sock->peer = other;
     sock->state = SOCKET_CONNECTED;
-    sock->addr = other->addr;
+    sock->peeraddr = other->localaddr;
     return (struct socket *)sock;
 }
 
@@ -364,7 +384,7 @@ static ssize_t unix_recvmsg(struct socket *_this, struct f_description *descript
             actual_size = sizeof(struct sockaddr_un);
         }
 
-        memcpy(msg->msg_name, &this->peer->addr, actual_size);
+        memcpy(msg->msg_name, &this->peer->localaddr, actual_size);
         msg->msg_namelen = actual_size;
     }
 
@@ -402,6 +422,7 @@ struct socket *socket_create_unix(int type, int protocol) {
     sock->bind = unix_bind;
     sock->connect = unix_connect;
     sock->getpeername = unix_getpeername;
+    sock->getsockname = unix_getsockname;
 	sock->listen = unix_listen;
     sock->accept = unix_accept;
     sock->recvmsg = unix_recvmsg;

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <ipc/socket.h>
+#include <ipc/socket/tcp.h>
 #include <ipc/socket/udp.h>
 #include <ipc/socket/unix.h>
 #include <lib/alloc.h>
@@ -34,6 +35,15 @@ static bool stub_connect(struct socket *this, struct f_description *description,
 }
 
 static bool stub_getpeername(struct socket *this, struct f_description *description, void *addr, socklen_t *len) {
+    (void)this;
+    (void)description;
+    (void)addr;
+    (void)len;
+    errno = ENOSYS;
+    return false;
+}
+
+static bool stub_getsockname(struct socket *this, struct f_description *description, void *addr, socklen_t *len) {
     (void)this;
     (void)description;
     (void)addr;
@@ -78,6 +88,28 @@ static ssize_t stub_sendmsg(struct socket *this, struct f_description *descripti
     return -1;
 }
 
+static ssize_t stub_getsockopt(struct socket *this, struct f_description *description, int level, int optname, void *optval, socklen_t *optlen) {
+    (void)this;
+    (void)description;
+    (void)level;
+    (void)optname;
+    (void)optval;
+    (void)optlen;
+    errno = ENOSYS;
+    return -1;
+}
+
+static ssize_t stub_setsockopt(struct socket *this, struct f_description *description, int level, int optname, const void *optval, socklen_t optlen) {
+    (void)this;
+    (void)description;
+    (void)level;
+    (void)optname;
+    (void)optval;
+    (void)optlen;
+    errno = ENOSYS;
+    return -1;
+}
+
 void *socket_create(int family, int type, int protocol, int size) {
     struct socket *sock = resource_create(size);
     if (sock == NULL) {
@@ -100,10 +132,13 @@ void *socket_create(int family, int type, int protocol, int size) {
     sock->bind = stub_bind;
     sock->connect = stub_connect;
     sock->getpeername = stub_getpeername;
+    sock->getsockname = stub_getsockname;
     sock->listen = stub_listen;
     sock->accept = stub_accept;
     sock->recvmsg = stub_recvmsg;
     sock->sendmsg = stub_sendmsg;
+    sock->getsockopt = stub_getsockopt;
+    sock->setsockopt = stub_setsockopt;
 
     return (struct socket *)sock;
 
@@ -124,25 +159,39 @@ int syscall_socket(void *_, int family, int type, int protocol) {
     struct thread *thread = sched_current_thread();
     struct process *proc = thread->process;
 
+    size_t socktype = type;
+    int flags = 0;
+    if (type & SOCK_CLOEXEC) {
+        flags |= O_CLOEXEC;
+        socktype -= SOCK_CLOEXEC;
+    }
+    if (type & SOCK_NONBLOCK) {
+        flags |= O_NONBLOCK;
+        socktype -= SOCK_NONBLOCK;
+    }
+
     struct socket *sock;
     switch (family) {
         case AF_UNIX:
-            sock = socket_create_unix(type, protocol);
+            sock = socket_create_unix(socktype, protocol);
             break;
         case AF_INET:
-            if (type == SOCK_STREAM) {
-                if (protocol == 0) {
-                    protocol = IPPROTO_TCP;
-                }
-                sock = NULL;
-            } else if (type == SOCK_DGRAM) {
-                if (protocol == 0) {
-                    protocol = IPPROTO_UDP;
-                }
-                sock = socket_create_udp(type, protocol);
-            } else {
-                errno = EINVAL;
-                goto cleanup;
+            switch (socktype) {
+                case SOCK_STREAM:
+                    if (protocol == 0) {
+                        protocol = IPPROTO_TCP;
+                    }
+                    sock = socket_create_tcp(socktype, protocol);
+                    break;
+                case SOCK_DGRAM:
+                    if (protocol == 0) {
+                        protocol = IPPROTO_UDP;
+                    }
+                    sock = socket_create_udp(socktype, protocol);
+                    break;
+                default:
+                    errno = EINVAL;
+                    goto cleanup;
             }
             break;
         default:
@@ -152,7 +201,98 @@ int syscall_socket(void *_, int family, int type, int protocol) {
 
     if (sock == NULL) {
         goto cleanup;
+    } 
+
+    ret = fdnum_create_from_resource(proc, (struct resource *)sock, flags, 0, false);
+    if (ret == -1) {
+        resource_free((struct resource *)sock);
+        goto cleanup;
     }
+
+cleanup:
+    DEBUG_SYSCALL_LEAVE("%d", ret);
+    return ret;
+}
+
+int syscall_setsockopt(void *_, int fdnum, int level, int optname, const void *optval, socklen_t optlen) {
+    (void)_;
+
+    DEBUG_SYSCALL_ENTER("setsockopt(%d, %d, %d, %lx, %lu)", fdnum, level, optname, optval, optlen);
+
+    int ret = -1;
+
+    struct thread *thread = sched_current_thread();
+    struct process *proc = thread->process;
+
+    struct f_descriptor *fd = fd_from_fdnum(proc, fdnum);
+    if (fd == NULL) {
+        goto cleanup;
+    }
+
+    struct f_description *desc = fd->description;
+    if (S_ISSOCK(desc->res->stat.st_mode)) {
+        struct socket *sock = (struct socket *)desc->res;
+
+        if (sock->state != SOCKET_CREATED) {
+            errno = EINVAL;
+        } else {
+            ret = sock->setsockopt(sock, desc, level, optname, optval, optlen);
+        }
+    } else {
+        errno = ENOTSOCK;
+    }
+
+    desc->refcount--;
+
+cleanup:
+    DEBUG_SYSCALL_LEAVE("%d", ret);
+    return ret;
+}
+
+int syscall_getsockopt(void *_, int fdnum, int level, int optname, void *optval, socklen_t *optlen) {
+    (void)_;
+
+    DEBUG_SYSCALL_ENTER("getsockopt(%d, %d, %d, %lx, %lx)", fdnum, level, optname, optval, optlen);
+
+    int ret = -1;
+
+    struct thread *thread = sched_current_thread();
+    struct process *proc = thread->process;
+
+    struct f_descriptor *fd = fd_from_fdnum(proc, fdnum);
+    if (fd == NULL) {
+        goto cleanup;
+    }
+
+    struct f_description *desc = fd->description;
+    if (S_ISSOCK(desc->res->stat.st_mode)) {
+        struct socket *sock = (struct socket *)desc->res;
+
+        if (sock->state != SOCKET_CREATED) {
+            errno = EINVAL;
+        } else {
+            ret = sock->getsockopt(sock, desc, level, optname, optval, optlen);
+        }
+    } else {
+        errno = ENOTSOCK;
+    }
+
+    desc->refcount--;
+
+cleanup:
+    DEBUG_SYSCALL_LEAVE("%d", ret);
+    return ret;
+}
+
+int syscall_socketpair(void *_, int domain, int type, int protocol, int *fds) {
+    (void)_;
+
+    DEBUG_SYSCALL_ENTER("socketpair(%d, %d, %d, %lx)", domain, type, protocol, fds);
+
+    int ret = -1;
+
+    struct thread *thread = sched_current_thread();
+    struct process *proc = thread->process;
 
     int flags = 0;
     if (type & SOCK_CLOEXEC) {
@@ -162,11 +302,31 @@ int syscall_socket(void *_, int family, int type, int protocol) {
         flags |= O_NONBLOCK;
     }
 
-    ret = fdnum_create_from_resource(proc, (struct resource *)sock, flags, 0, false);
-    if (ret == -1) {
-        resource_free((struct resource *)sock);
-        goto cleanup;
+    struct socket *sock0 = NULL;
+    struct socket *sock1 = NULL;
+
+    switch (domain) {
+        case AF_UNIX: {
+            sock0 = socket_create_unix(type, protocol);
+            sock1 = socket_create_unix(type, protocol);
+            sock0->peer = sock1;
+            sock1->peer = sock0;
+            sock0->state = SOCKET_CONNECTED;
+            sock1->state = SOCKET_CONNECTED;
+
+            sock0->status |= POLLOUT;
+            sock1->status |= POLLOUT;
+            break;
+        }    
+        default:
+            errno = EINVAL;
+            goto cleanup;
     }
+
+    fds[0] = fdnum_create_from_resource(proc, (struct resource *)sock0, flags, 0, false);
+    fds[1] = fdnum_create_from_resource(proc, (struct resource *)sock1, flags, 0, false);
+
+    ret = 0;
 
 cleanup:
     DEBUG_SYSCALL_LEAVE("%d", ret);
@@ -405,6 +565,39 @@ int syscall_getpeername(void *_, int fdnum, void *addr, socklen_t *len) {
         if (sock->state != SOCKET_CONNECTED) {
             errno = ENOTCONN;
         } else if (sock->getpeername(sock, desc, addr, len)) {
+            ret = 0;
+        }
+    } else {
+        errno = ENOTSOCK;
+    }
+
+    desc->refcount--;
+
+cleanup:
+    DEBUG_SYSCALL_LEAVE("%d", ret);
+    return ret;
+}
+
+int syscall_getsockname(void *_, int fdnum, void *addr, socklen_t *len) {
+    (void)_;
+
+    DEBUG_SYSCALL_ENTER("getsockname(%d, %lx, %lx)", fdnum, addr, len);
+
+    ssize_t ret = -1;
+
+    struct thread *thread = sched_current_thread();
+    struct process *proc = thread->process;
+
+    struct f_descriptor *fd = fd_from_fdnum(proc, fdnum);
+    if (fd == NULL) {
+        goto cleanup;
+    }
+
+    struct f_description *desc = fd->description;
+    if (S_ISSOCK(desc->res->stat.st_mode)) {
+        struct socket *sock = (struct socket *)desc->res;
+
+        if (sock->getsockname(sock, desc, addr, len)) {
             ret = 0;
         }
     } else {

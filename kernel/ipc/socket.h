@@ -19,7 +19,8 @@ enum socket_state {
 
 struct socket {
     struct resource;
-    struct sockaddr_storage addr;
+    struct sockaddr_storage localaddr;
+    struct sockaddr_storage peeraddr;
 
     struct socket **backlog;
     size_t backlog_max;
@@ -28,6 +29,7 @@ struct socket {
     struct event connect_event;
     enum socket_state state;
     struct socket *peer;
+    bool bound;
 
     int family;
     int type;
@@ -36,10 +38,13 @@ struct socket {
     bool (*bind)(struct socket *this, struct f_description *description, void *addr, socklen_t len);
     bool (*connect)(struct socket *this, struct f_description *description, void *addr, socklen_t len);
     bool (*getpeername)(struct socket *this, struct f_description *description, void *addr, socklen_t *len);
+    bool (*getsockname)(struct socket *this, struct f_description *description, void *addr, socklen_t *len);
     bool (*listen)(struct socket *this, struct f_description *description, int backlog);
     struct socket *(*accept)(struct socket *this, struct f_description *description, struct socket *other, void *addr, socklen_t *len);
     ssize_t (*recvmsg)(struct socket *this, struct f_description *description, struct msghdr *msg, int flags);
     ssize_t (*sendmsg)(struct socket *this, struct f_description *description, const struct msghdr *msg, int flags);
+    ssize_t (*getsockopt)(struct socket *this, struct f_description *description, int level, int optname, void *optval, socklen_t *optlen);
+    ssize_t (*setsockopt)(struct socket *this, struct f_description *description, int level, int optname, const void *optval, socklen_t optlen);
 };
 
 struct inetsocket {
@@ -48,8 +53,8 @@ struct inetsocket {
 
     be_uint16_t port; // redundancy
     be_uint16_t destport; // redundancy
-    struct sockaddr_storage peeraddr;
-    bool localbound;
+    bool canbroadcast;
+    bool canroute;
 };
 
 void *socket_create(int family, int type, int protocol, int size);

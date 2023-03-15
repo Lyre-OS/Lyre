@@ -4,7 +4,9 @@
 #include <lib/lock.h>
 #include <lib/resource.h>
 #include <lib/vector.h>
+#include <net/if.h>
 #include <stdint.h>
+#include <sys/socket.h>
 
 #define NET_PORTRANGESTART 49152
 #define NET_PORTRANGEEND UINT16_MAX
@@ -12,41 +14,8 @@
 #define NET_ETHPROTOIPV4 0x800
 #define NET_ETHPROTOARP 0x806
 
-#define NET_IPPROTOICMP 0x01
-#define NET_IPPROTOTCP 0x06
-#define NET_IPPROTOUDP 0x11
-
-typedef struct {
-    union {
-        uint16_t value; // big endian representation
-        struct {
-            uint8_t hi;
-            uint8_t lo;
-        } __attribute__((packed)); // pack together tightly
-    };
-} be_uint16_t;
-
-typedef struct {
-    union {
-        uint32_t value;
-        struct {
-            union {
-                uint16_t high;
-                struct {
-                    uint8_t hhi;
-                    uint8_t hlo;
-                };
-            };
-            union {
-                uint16_t low;
-                struct {
-                    uint8_t lhi;
-                    uint8_t llo;
-                };
-            };
-        };
-    };
-} be_uint32_t;
+typedef uint16_t be_uint16_t;
+typedef uint32_t be_uint32_t;
 
 struct net_inetaddr {
     union {
@@ -64,6 +33,11 @@ struct net_icmpheader {
     uint8_t data[];
 } __attribute__((packed));
 
+#define NET_IPFLAGMF 0x2000
+#define NET_IPFLAGDF 0x4000
+#define NET_IPFLAGRF 0x8000
+#define NET_IPOFFMASK 0x1fff
+
 struct net_inetheader {
     uint8_t ihl : 4;
     uint8_t version : 4;
@@ -71,8 +45,7 @@ struct net_inetheader {
     uint8_t dscp : 6;
     be_uint16_t len;
     be_uint16_t id;
-    uint8_t flags : 3;
-    uint16_t fragoff : 13;
+    be_uint16_t fragoff;
     uint8_t ttl;
     uint8_t protocol;
     be_uint16_t csum;
@@ -117,19 +90,21 @@ struct net_inethwpair {
 struct net_adapter {
     struct resource;
 
-    bool linkstate;
     struct net_macaddr mac;
+    struct net_macaddr permmac;
     struct net_inetaddr ip;
     struct net_inetaddr gateway;
     struct net_inetaddr subnetmask;
     uint16_t ipframe;
-    size_t index;
+    uint16_t flags;
+    int index;
+    size_t hwmtu; // hardware driver MTU
     size_t mtu;
     VECTOR_TYPE(struct net_inethwpair *) addrcache; // keep a record (per adapter as they may be connected to different networks) of IP-to-MAC records (from the ARP cache)
     spinlock_t addrcachelock;
     VECTOR_TYPE(struct net_packet *) cache;
     spinlock_t cachelock; // not the same as the char device lock
-    char *ifname;
+    char ifname[IFNAMSIZ];
     uint8_t type;
     struct event packetevent; // signal for packet arrival
 
@@ -137,7 +112,16 @@ struct net_adapter {
     VECTOR_TYPE(struct socket *) boundsocks;
 
     void (*txpacket)(struct net_adapter *adapter, const void *data, size_t length);
+    void (*updateflags)(struct net_adapter *adapter, uint16_t old);
 };
+
+#define NET_LINKLAYERFRAMESIZE(a) ({ \
+    __auto_type LINKLAYERFRAMESIZE_ret = 0; \
+    if (a->type & NET_ADAPTERETH) { \
+        LINKLAYERFRAMESIZE_ret = sizeof(struct net_etherframe); \
+    } \
+    LINKLAYERFRAMESIZE_ret; \
+})
 
 #define NET_IP(a, b, c, d) (((uint32_t)d << 24) | ((uint32_t)c << 16) | ((uint32_t)b << 8) | ((uint32_t)a << 0))
 #define NET_IPSTRUCT(a) ({ (struct net_inetaddr) { .value = (a) }; })
@@ -150,8 +134,9 @@ enum {
     NET_ADAPTERLO = (1 << 1)
 };
 
-int net_sockioctl(struct resource *_this, struct f_description *description, uint64_t request, uint64_t arg);
 int net_ifioctl(struct resource *_this, struct f_description *description, uint64_t request, uint64_t arg);
+ssize_t net_getsockopt(struct socket *_this, struct f_description *description, int level, int optname, void *optval, socklen_t *optlen);
+ssize_t net_setsockopt(struct socket *_this, struct f_description *description, int level, int optname, const void *optval, socklen_t optlen);
 
 be_uint16_t net_checksum(void *data, size_t length);
 ssize_t net_sendinet(struct net_adapter *adapter, struct net_inetaddr src, struct net_inetaddr dest, uint8_t protocol, void *data, size_t length);
