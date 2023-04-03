@@ -2,10 +2,9 @@ name=kernel
 version=0.0
 source_dir="kernel"
 hostdeps="automake autoconf"
-imagedeps="git"
+imagedeps="git gcc rsync meson ninja"
 allow_network="yes"
 
 regenerate() {
     ./bootstrap
-    libtoolize -cfvi && autoreconf -fvi
 }

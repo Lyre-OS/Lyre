@@ -41,37 +41,42 @@ if ! test "x$FIND_FOUND" = "xyes"; then
     AC_MSG_ERROR([find not found, please install find before configuring])
 fi
 
-AC_ARG_VAR([FREESTANDING_TOOLCHAIN], [alternative freestanding toolchain prefix (or 'llvm', or 'gnu')])
-AC_ARG_VAR([FREESTANDING_CC], [freestanding C compiler command])
-AC_ARG_VAR([FREESTANDING_LD], [freestanding linker command])
-AC_ARG_VAR([FREESTANDING_OBJDUMP], [freestanding objdump command])
-AC_ARG_VAR([FREESTANDING_STRIP], [freestanding strip command])
+AC_ARG_VAR([TOOLCHAIN], [alternative toolchain prefix (or 'llvm', or 'gnu')])
+AC_ARG_VAR([CC], [C compiler command])
+AC_ARG_VAR([LD], [linker command])
+AC_ARG_VAR([OBJDUMP], [objdump command])
+AC_ARG_VAR([STRIP], [strip command])
 
 rm -rf "$BUILDDIR/toolchain-files"
 $MKDIR_P "$BUILDDIR/toolchain-files"
 ARCHITECTURE="$ARCH" \
+    FREESTANDING_TOOLCHAIN="$TOOLCHAIN" \
     WANT_FREESTANDING_CC=yes \
+    FREESTANDING_CC="$CC" \
     WANT_FREESTANDING_LD=yes \
+    FREESTANDING_LD="$LD" \
     WANT_FREESTANDING_STRIP=yes \
+    FREESTANDING_STRIP="$STRIP" \
     WANT_FREESTANDING_OBJDUMP=yes \
+    FREESTANDING_OBJDUMP="$OBJDUMP" \
     "$SRCDIR/freestanding-toolchain" >"$BUILDDIR/toolchain-files/$ARCH-toolchain.mk" || exit 1
 
 AC_SUBST([TOOLCHAIN_FILE], [toolchain-files/$ARCH-toolchain.mk])
 
-m4_define([DEFAULT_FREESTANDING_CFLAGS], [-g -O2 -pipe -Wall -Wextra])
-AC_ARG_VAR([FREESTANDING_CFLAGS], [freestanding C flags @<:@default: ]DEFAULT_FREESTANDING_CFLAGS[@:>@])
-test "x$FREESTANDING_CFLAGS" = "x" && FREESTANDING_CFLAGS="DEFAULT_FREESTANDING_CFLAGS"
+m4_define([DEFAULT_CFLAGS], [-g -O2 -pipe -Wall -Wextra])
+AC_ARG_VAR([CFLAGS], [C flags @<:@default: ]DEFAULT_CFLAGS[@:>@])
+test "x$CFLAGS" = "x" && CFLAGS="DEFAULT_CFLAGS"
 if test "$werror_state" = "yes"; then
-    FREESTANDING_CFLAGS="$FREESTANDING_CFLAGS -Werror"
+    CFLAGS="$CFLAGS -Werror"
 fi
 
-m4_define([DEFAULT_FREESTANDING_CPPFLAGS], [])
-AC_ARG_VAR([FREESTANDING_CPPFLAGS], [freestanding C preprocessor flags @<:@default: ]DEFAULT_FREESTANDING_CPPFLAGS[@:>@])
-test "x$FREESTANDING_CPPFLAGS" = "x" && FREESTANDING_CPPFLAGS="DEFAULT_FREESTANDING_CPPFLAGS"
+m4_define([DEFAULT_CPPFLAGS], [])
+AC_ARG_VAR([CPPFLAGS], [C preprocessor flags @<:@default: ]DEFAULT_CPPFLAGS[@:>@])
+test "x$CPPFLAGS" = "x" && CPPFLAGS="DEFAULT_CPPFLAGS"
 
-m4_define([DEFAULT_FREESTANDING_LDFLAGS], [])
-AC_ARG_VAR([FREESTANDING_LDFLAGS], [freestanding linker flags @<:@default: ]DEFAULT_FREESTANDING_LDFLAGS[@:>@])
-test "x$FREESTANDING_LDFLAGS" = "x" && FREESTANDING_LDFLAGS="DEFAULT_FREESTANDING_LDFLAGS"
+m4_define([DEFAULT_LDFLAGS], [])
+AC_ARG_VAR([LDFLAGS], [linker flags @<:@default: ]DEFAULT_LDFLAGS[@:>@])
+test "x$LDFLAGS" = "x" && LDFLAGS="DEFAULT_LDFLAGS"
 
 AC_ARG_VAR([LYRE_DEBUG], [debug mode])
 test "x$LYRE_DEBUG" = "x" && LYRE_DEBUG="0"

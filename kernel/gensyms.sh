@@ -27,7 +27,7 @@ TMP3="$(mktemp)"
 
 trap "rm -f '$TMP1' '$TMP2' '$TMP3'; trap - EXIT; exit" EXIT INT TERM QUIT HUP
 
-"$FREESTANDING_OBJDUMP" -t "$1" | ( "$SED" '/[[:<:]]d[[:>:]]/d' 2>/dev/null || "$SED" '/\bd\b/d' ) | sort > "$TMP1"
+"$OBJDUMP" -t "$1" | ( "$SED" '/[[:<:]]d[[:>:]]/d' 2>/dev/null || "$SED" '/\bd\b/d' ) | sort > "$TMP1"
 "$GREP" "\.text" < "$TMP1" | cut -d' ' -f1 > "$TMP2"
 "$GREP" "\.text" < "$TMP1" | "$AWK" 'NF{ print $NF }' > "$TMP3"
 

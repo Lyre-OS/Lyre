@@ -17,46 +17,11 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install build-essential meson nasm rsync clang llvm lld -y
 
-      - name: Download linux-headers
-        run: |
-          curl -Lo linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-`grep 'version=' < source-recipes/linux | sed 's/version=//g'`.tar.xz
-          tar -xf linux.tar.xz
-          mv linux-* linux
-
-      - name: Build linux-headers
-        run: |
-          cd linux
-          make ARCH=x86_64 headers_install
-          find usr/include -type f ! -name *.h -delete
-          rm usr/include/linux/libc-compat.h
-
-      - name: Clone mlibc
-        run: git clone https://github.com/mintsuki/mlibc.git
-
-      - name: Checkout and patch mlibc
-        run: |
-          cd mlibc
-          git checkout `grep 'version=' < ../source-recipes/mlibc | sed 's/version=//g'`
-          for f in ../patches/mlibc/*; do patch -p1 < $f; done
-
-      - name: Install mlibc headers
-        run: |
-          mkdir mlibc-build
-          cd mlibc-build
-          meson setup --cross-file ../build-support/cross_file.txt --prefix=/ -Dheaders_only=true -Dlinux_kernel_headers=../linux/usr/include ../mlibc
-          ninja
-          mkdir ../mlibc-headers
-          DESTDIR=`realpath ../mlibc-headers` ninja install
-
-      - name: Fetch limine.h
-        run: |
-          curl -o mlibc-headers/include/limine.h https://raw.githubusercontent.com/limine-bootloader/limine/trunk/limine.h
-
       - name: Attempt to build the Lyre kernel (debug)
         run: |
           cd kernel
           ./bootstrap
-          ./configure --enable-werror FREESTANDING_CPPFLAGS="-nostdinc -I`realpath ../mlibc-headers/include` -I`realpath ../linux/usr/include`"
+          ./configure --enable-werror CPPFLAGS="-nostdinc -I`realpath ../mlibc-headers/include` -I`realpath ../linux/usr/include`"
           make
           make maintainer-clean
 
@@ -64,6 +29,6 @@ jobs:
         run: |
           cd kernel
           ./bootstrap
-          ./configure --enable-werror LYRE_DEBUG=1 FREESTANDING_CPPFLAGS="-nostdinc -I`realpath ../mlibc-headers/include` -I`realpath ../linux/usr/include`"
+          ./configure --enable-werror LYRE_DEBUG=1 CPPFLAGS="-nostdinc -I`realpath ../mlibc-headers/include` -I`realpath ../linux/usr/include`"
           make
           make maintainer-clean

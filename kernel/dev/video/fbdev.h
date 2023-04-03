@@ -3,4 +3,6 @@
 
 void fbdev_init(void);
 
+extern volatile struct limine_framebuffer_request framebuffer_request;
+
 #endif

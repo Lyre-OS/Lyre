@@ -8,12 +8,45 @@ test -z "$srcdir" && srcdir=.
 cd "$srcdir"
 
 [ -f freestanding-toolchain ] || ( curl -Lo freestanding-toolchain https://github.com/mintsuki/freestanding-toolchain/raw/trunk/freestanding-toolchain && chmod +x freestanding-toolchain )
-[ -d freestanding-headers ] || git clone https://github.com/mintsuki/freestanding-headers.git
-[ -d libgcc-binaries ] || git clone https://github.com/mintsuki/libgcc-binaries.git
+[ -d freestanding-headers ] || git clone https://github.com/mintsuki/freestanding-headers.git --depth=1
+[ -d libgcc-binaries ] || git clone https://github.com/mintsuki/libgcc-binaries.git --depth=1
+[ -f limine.h ] || curl -Lo limine.h https://github.com/limine-bootloader/limine/raw/trunk/limine.h
+[ -d flanterm ] || git clone https://github.com/mintsuki/flanterm.git --depth=1
 if ! [ -d printf ]; then
     mkdir printf
     curl -Lo printf/printf.c https://github.com/eyalroz/printf/raw/master/src/printf/printf.c
     curl -Lo printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
 fi
+
+if ! [ -d linux-headers ]; then
+    curl -Lo linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(grep 'version=' < ../source-recipes/linux | sed 's/version=//g').tar.xz
+    tar -xf linux.tar.xz
+    mv linux-* linux-src
+    cd linux-src
+    make ARCH=x86_64 headers_install
+    find usr/include -type f ! -name *.h -delete
+    rm usr/include/linux/libc-compat.h
+    cd ..
+    mv linux-src/usr/include linux-headers
+    rm -rf linux.tar.xz linux-src
+fi
+
+if ! [ -d mlibc-headers ]; then
+    git clone https://github.com/managarm/mlibc.git
+    cd mlibc
+    git checkout $(grep 'version=' < ../../source-recipes/mlibc | sed 's/version=//g')
+    for f in ../../patches/mlibc/*; do patch -p1 < $f; done
+    mkdir ../mlibc-build
+    cd ../mlibc-build
+    meson setup --cross-file ../../build-support/cross_file.txt --prefix=/ -Dheaders_only=true -Dlinux_kernel_headers=../linux-headers ../mlibc
+    ninja
+    DESTDIR=$(realpath ../mlibc-headers-out) ninja install
+    cd ..
+    mv mlibc-headers-out/include mlibc-headers
+    rm -rf mlibc mlibc-build mlibc-headers-out
+fi
+
+mkdir -p build-aux
+cp "$(automake --print-libdir)/install-sh" build-aux
 
 autoreconf -fvi -Wall

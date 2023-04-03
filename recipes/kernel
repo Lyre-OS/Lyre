@@ -6,7 +6,7 @@ hostdeps="gcc binutils"
 
 configure() {
     ${source_dir}/configure \
-        FREESTANDING_TOOLCHAIN=x86_64-lyre \
+        TOOLCHAIN=x86_64-lyre \
         --prefix=${prefix}
 }
 

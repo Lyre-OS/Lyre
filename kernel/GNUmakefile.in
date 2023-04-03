@@ -1,7 +1,17 @@
-# Nuke built-in rules and variables
+# Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
 
-# Import some autoconf variables as make variables
+# Convenience macro to reliably declare user overridable variables.
+define DEFAULT_VAR =
+    ifeq ($(origin $1),default)
+        override $(1) := $(2)
+    endif
+    ifeq ($(origin $1),undefined)
+        override $(1) := $(2)
+    endif
+endef
+
+# Import some autoconf variables as make variables.
 override ARCH := @ARCH@
 override SRCDIR := @SRCDIR@
 override BUILDDIR := @BUILDDIR@
@@ -37,20 +47,22 @@ OBJESCAPE = $(subst .a ,.a' ',$(subst .o ,.o' ',$(call SHESCAPE,$(1))))
 
 # Include toolchain file.
 include $(call MKESCAPE,$(TOOLCHAIN_FILE))
+export OBJDUMP
 
 # User controllable CFLAGS.
-FREESTANDING_CFLAGS ?= @FREESTANDING_CFLAGS@
+$(eval $(call DEFAULT_VAR,CFLAGS,@CFLAGS@))
 
 # User controllable CPPFLAGS.
-FREESTANDING_CPPFLAGS ?= @FREESTANDING_CPPFLAGS@
+$(eval $(call DEFAULT_VAR,CPPFLAGS,@CPPFLAGS@))
 
 # User controllable linker flags.
-FREESTANDING_LDFLAGS ?= @FREESTANDING_LDFLAGS@
+$(eval $(call DEFAULT_VAR,LDFLAGS,@LDFLAGS@))
 
 # Internal C flags that should not be changed by the user.
-override FREESTANDING_CFLAGS += \
+override CFLAGS += \
     -g \
     -std=gnu11 \
+    -nostdinc \
     -fms-extensions \
     -fno-omit-frame-pointer \
     -fno-strict-aliasing \
@@ -65,31 +77,34 @@ override FREESTANDING_CFLAGS += \
     -Wshadow
 
 # Internal C preprocessor flags that should not be changed by the user.
-override FREESTANDING_CPPFLAGS := \
+override CPPFLAGS := \
     -I'$(call SHESCAPE,$(SRCDIR))/freestanding-headers' \
+    -I'$(call SHESCAPE,$(SRCDIR))/mlibc-headers' \
+    -I'$(call SHESCAPE,$(SRCDIR))/linux-headers' \
     -I'$(call SHESCAPE,$(SRCDIR))' \
-    $(FREESTANDING_CPPFLAGS) \
+    $(CPPFLAGS) \
     -Ddebug=$(LYRE_DEBUG) \
     -DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES=1 \
     -DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD=1 \
     -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 \
     -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0 \
-    -MMD
+    -MMD \
+    -MP
 
 # Internal linker flags that should not be changed by the user.
-override FREESTANDING_LDFLAGS += \
+override LDFLAGS += \
     -nostdlib \
     -static \
     -z max-page-size=0x1000 \
     -T '$(call SHESCAPE,$(SRCDIR)/linker-$(ARCH).ld)'
 
-ifeq ($(FREESTANDING_LD_HAS_NO_PIE),yes)
-    override FREESTANDING_LDFLAGS += -no-pie
+ifeq ($(LD_HAS_NO_PIE),yes)
+    override LDFLAGS += -no-pie
 endif
 
 # Set archtecture specific variables (and check that the architecture is supported).
 ifeq ($(ARCH),x86_64)
-    override FREESTANDING_CFLAGS += \
+    override CFLAGS += \
         -m64 \
         -march=x86-64 \
         -mabi=sysv \
@@ -99,16 +114,17 @@ ifeq ($(ARCH),x86_64)
         -mno-sse2 \
         -mno-red-zone \
         -mcmodel=kernel
-    override FREESTANDING_LDFLAGS += \
+    override LDFLAGS += \
         -m elf_x86_64
     override LIBGCC := x86_64-no-red-zone
 else
     $(error Architecture $(ARCH) not supported)
 endif
 
-# Use find to glob all *.c, *.S, and *.asm files in the directory and extract the object names.
-override CFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))' && find . -type f -name '*.c')
-override ASFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))' && find . -type f -name '*.S')
+# Use "find" to glob all *.c, *.S, and *.asm files in the tree and obtain the
+# object and header dependency file names.
+override CFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))' && find -L . -type f -name '*.c')
+override ASFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))' && find -L . -type f -name '*.S')
 override OBJ := $(addprefix $(call MKESCAPE,$(BUILDDIR))/,$(CFILES:.c=.o) $(ASFILES:.S=.o))
 override HEADER_DEPS := $(CFILES:.c=.d) $(ASFILES:.S=.d)
 
@@ -119,10 +135,10 @@ all: $(OUTPUT)
 # Link rules for the final kernel executable.
 $(OUTPUT): $(OBJ) $(call MKESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a
 	$(MKDIR_P) bin
-	$(FREESTANDING_LD) '$(call OBJESCAPE,$^)' $(FREESTANDING_LDFLAGS) -o $@
+	$(LD) '$(call OBJESCAPE,$^)' $(LDFLAGS) -o $@
 	'$(call SHESCAPE,$(SRCDIR))/gensyms.sh' $@ > symtab.map
-	$(FREESTANDING_CC) $(FREESTANDING_CFLAGS) $(FREESTANDING_CPPFLAGS) -x c -c symtab.map -o symtab.o
-	$(FREESTANDING_LD) '$(call OBJESCAPE,$^)' symtab.o $(FREESTANDING_LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -x c -c symtab.map -o symtab.o
+	$(LD) '$(call OBJESCAPE,$^)' symtab.o $(LDFLAGS) -o $@
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
@@ -130,17 +146,18 @@ $(OUTPUT): $(OBJ) $(call MKESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a
 # Compilation rules for *.c files.
 $(call MKESCAPE,$(BUILDDIR))/%.o: $(call MKESCAPE,$(SRCDIR))/%.c
 	$(MKDIR_P) "$$(dirname '$(call SHESCAPE,$@)')"
-	$(FREESTANDING_CC) $(FREESTANDING_CFLAGS) $(FREESTANDING_CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
 
 # Compilation rules for *.S files.
 $(call MKESCAPE,$(BUILDDIR))/%.o: $(call MKESCAPE,$(SRCDIR))/%.S
 	$(MKDIR_P) "$$(dirname '$(call SHESCAPE,$@)')"
-	$(FREESTANDING_CC) $(FREESTANDING_CFLAGS) $(FREESTANDING_CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
 
 # Remove object files and the final executable.
 .PHONY: clean
 clean:
 	rm -rf bin $(OBJ) $(HEADER_DEPS)
+	rm -rf symtab.map symtab.o symtab.d
 
 # Remove files generated by configure.
 .PHONY: distclean
@@ -162,6 +179,7 @@ dist:
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/freestanding-headers/.git
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/libgcc-binaries/.git
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/libgcc-binaries/.gitignore
+	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/flanterm/.git
 
 	libgcc_needed="x86_64-no-red-zone"; \
 	for f in $$libgcc_needed; do \
@@ -180,7 +198,7 @@ dist:
 # Remove ALL generated files.
 .PHONY: maintainer-clean
 maintainer-clean: distclean
-	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf printf freestanding-headers libgcc-binaries freestanding-toolchain configure build-aux *'~' autom4te.cache
+	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf printf flanterm mlibc-headers linux-headers freestanding-headers libgcc-binaries freestanding-toolchain limine.h configure build-aux *'~' autom4te.cache
 
 # Install files and executables to the final locations.
 .PHONY: install
@@ -191,7 +209,7 @@ install: all
 # Install and strip executables.
 .PHONY: install-strip
 install-strip: install
-	$(FREESTANDING_STRIP) '$(call SHESCAPE,$(DESTDIR)$(datarootdir))/$(PACKAGE_TARNAME)'/"$$(basename '$(OUTPUT)')"
+	$(STRIP) '$(call SHESCAPE,$(DESTDIR)$(datarootdir))/$(PACKAGE_TARNAME)'/"$$(basename '$(OUTPUT)')"
 
 # Uninstall previously installed files and executables.
 .PHONY: uninstall

@@ -7,7 +7,7 @@ imagedeps="nasm gcc mtools"
 configure() {
     "${source_dir}"/configure \
         --prefix="${prefix}" \
-        FREESTANDING_TOOLCHAIN=x86_64-lyre \
+        TOOLCHAIN_FOR_TARGET=x86_64-lyre \
         LDFLAGS="-static" \
         --enable-all \
         --disable-uefi-aarch64

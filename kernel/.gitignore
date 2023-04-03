@@ -7,6 +7,7 @@
 *.tar.gz
 *.tar.xz
 /bin
+/limine.h
 /compile_commands.json
 /freestanding-toolchain
 /toolchain-files
@@ -21,4 +22,8 @@
 /config.log
 /autom4te.cache
 /GNUmakefile
+/symtab.map
 /printf
+/flanterm
+/linux-headers
+/mlibc-headers

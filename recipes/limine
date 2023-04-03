@@ -13,7 +13,7 @@ configure() {
         --localstatedir=/var \
         --enable-all \
         --disable-uefi-aarch64 \
-        FREESTANDING_TOOLCHAIN=x86_64-lyre
+        TOOLCHAIN_FOR_TARGET=x86_64-lyre
 }
 
 build() {
