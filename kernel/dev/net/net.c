@@ -10,9 +10,8 @@
 #include <lib/event.k.h>
 #include <lib/lock.k.h>
 #include <lib/print.k.h>
-#include <linux/sockios.h>
+#include <lyre/sockios.h>
 #include <net/if.h>
-#include <linux/route.h>
 #include <netinet/in.h>
 #include <printf/printf.h>
 #include <sched/sched.k.h>
@@ -619,31 +618,6 @@ int net_ifioctl(struct resource *_this, struct f_description *description, uint6
 
     struct net_adapter *this = NULL; // adapter in question
     switch (request) {
-        case SIOCADDRT: {
-            struct rtentry *route = (struct rtentry *)arg;
-            VECTOR_FOR_EACH(&net_adapters, it,
-                struct net_adapter *a = *it;
-                if (!strncmp(a->ifname, route->rt_dev, IFNAMSIZ)) {
-                    this = a;
-                }
-            );
-
-            if (this == NULL) {
-                VECTOR_FOR_EACH(&net_adapters, it,
-                    struct net_adapter *a = *it;
-                    if (a->index == req->ifr_ifru.ifru_ivalue) {
-                        this = a;
-                    }
-                );
-
-                if (this == NULL) {
-                    // XXX: Should there be an errno?
-                    errno = ENODEV;
-                    return -1;
-                }
-            }
-            break;
-        }
         default: {
             VECTOR_FOR_EACH(&net_adapters, it,
                 struct net_adapter *a = *it;
@@ -671,24 +645,22 @@ int net_ifioctl(struct resource *_this, struct f_description *description, uint6
     }
 
     switch (request) {
-        case SIOCADDRT: {
-            // XXX: Properly figure out route tables instead of simply just setting the gateway
-            struct rtentry *route = (struct rtentry *)arg;
-            if (route->rt_flags & RTF_GATEWAY && route->rt_flags & RTF_UP) {
-                struct sockaddr_in *addr = (struct sockaddr_in *)&route->rt_gateway;
-                if (addr->sin_family != AF_INET) {
-                    errno = ENOPROTOOPT;
-                    return -1;
-                }
-
-                this->gateway.value = addr->sin_addr.s_addr;
-
-                struct net_macaddr mac = { 0 };
-                net_lookup(this, this->gateway, &mac); // force lookup
-                return 0;
+        case SIOCGIFGATEWAY: { // XXX: Make a gateway ioctl
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_addr;
+            inaddr->sin_family = AF_INET;
+            inaddr->sin_addr.s_addr = this->gateway.value;
+            return 0;
+        }
+        case SIOCSIFGATEWAY: { // XXX: Make a gateway ioctl
+            struct sockaddr_in *inaddr = (struct sockaddr_in *)&req->ifr_addr;
+            if (inaddr->sin_family != AF_INET) {
+                errno = EPROTONOSUPPORT;
+                return -1;
             }
-            errno = EINVAL;
-            return -1;
+
+            this->gateway.value = inaddr->sin_addr.s_addr;
+
+            return 0;
         }
         case SIOCGIFFLAGS: {
             req->ifr_ifru.ifru_flags = this->flags;

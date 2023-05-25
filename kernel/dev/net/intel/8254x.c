@@ -162,6 +162,7 @@ static void e8254x_initrx(struct e8254x_device *device) {
     for (size_t i = 0; i < 256; i++) {
         struct e8254x_rxdesc *desc = &device->rxdescs[i]; // since it's allocated as physical memory we want it as higher half
         uint64_t phys = (uint64_t)pmm_alloc(1);
+        memset((void *)phys, 0, PAGE_SIZE);
         desc->addr = phys;
         desc->status = 0;
     }
@@ -186,6 +187,7 @@ static void e8254x_inittx(struct e8254x_device *device) {
     for (size_t i = 0; i < 256; i++) {
         struct e8254x_txdesc *desc = &device->txdescs[i];
         uint64_t phys = (uint64_t)pmm_alloc(1);
+        memset((void *)phys, 0, PAGE_SIZE);
         desc->addr = phys;
         desc->status = 0;
     }
@@ -194,7 +196,7 @@ static void e8254x_inittx(struct e8254x_device *device) {
 }
 
 static void e8254x_linkupdate(struct e8254x_device *device) {
-    int link = e8254x_readreg(device, E1000_STATUS) | E8254X_STATUSLU;
+    bool link = e8254x_readreg(device, E1000_STATUS) & E8254X_STATUSLU;
 
     // IFF_RUNNING only defines the operative state of the hardware *not* the administrative state (administrative is completely software)
     if (link) {
@@ -213,6 +215,8 @@ static void e8254x_updateflags(struct net_adapter *device, uint16_t old) {
 
     if (old & IFF_RUNNING && !(device->flags & IFF_RUNNING)) {
         device->flags |= IFF_RUNNING; // disallow change
+    } else if (!(old & IFF_RUNNING) && (device->flags & IFF_RUNNING)) {
+        device->flags &= ~IFF_RUNNING; // disallow changes
     }
 }
 
@@ -296,7 +300,7 @@ static noreturn void e8254x_routine(struct e8254x_device *device) {
 static void e8254x_initcontroller(struct pci_device *device) {
     kernel_print("e8254x: Initialising ethernet controller (%04x:%04x)\n", device->vendor_id, device->device_id);
 
-    pci_set_privl(device, PCI_PRIV_BUSMASTER | PCI_PRIV_MMIO);
+    pci_set_privl(device, PCI_PRIV_BUSMASTER | PCI_PRIV_MMIO | PCI_PRIV_PIO);
 
     struct e8254x_device *dev = resource_create(sizeof(struct e8254x_device));
     dev->rxtail = 0;
@@ -316,8 +320,7 @@ static void e8254x_initcontroller(struct pci_device *device) {
     time_nsleep(10 * 1000000);
 
     e8254x_writereg(dev, E1000_CTRL, e8254x_readreg(dev, E1000_CTRL) | E8254X_CTRLRST); // reset controller
-    time_nsleep(10 * 1000000);
-    while (e8254x_readreg(dev, E1000_CTRL) & E8254X_CTRLRST); // wait for bit clear
+    while (e8254x_readreg(dev, E1000_CTRL) & E8254X_CTRLRST) time_nsleep(1000); // wait for bit clear
 
     e8254x_writereg(dev, E1000_IMC, 0xffffffff);
     e8254x_writereg(dev, E1000_ICR, 0xffffffff);
@@ -361,7 +364,7 @@ static void e8254x_initcontroller(struct pci_device *device) {
     }
 
     for (size_t i = 0; i < 64; i++) {
-        e8254x_readreg(dev, E1000_CRCERRS + i * 4);
+        e8254x_readreg(dev, E1000_CRCERRS + i * 4); // clear statistic registers
     }
 
     e8254x_initrx(dev);
@@ -386,12 +389,6 @@ static void e8254x_initcontroller(struct pci_device *device) {
     net_register((struct net_adapter *)dev);
 
     dev->cachelock = (spinlock_t)SPINLOCK_INIT;
-
-    // NOTE: Until network configuration is a thing, please just adjust these values to your usage
-    // dev->subnetmask = NET_IPSTRUCT(NET_IP(255, 255, 255, 0)); // default subnet mask (XXX: Change to be 255.255.255.255 for no subnet, rely on later configuration to function)
-    // dev->gateway = NET_IPSTRUCT(NET_IP(192, 168, 122, 1));
-    // XXX: Use userland network configuration instead!
-    // dev->ip = NET_IPSTRUCT(NET_IP(192, 168, 122, 2));
 
     devtmpfs_add_device((struct resource *)dev, dev->ifname);
     sched_new_kernel_thread(e8254x_routine, dev, true);

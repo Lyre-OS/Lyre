@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <asm/ioctls.h>
 #include <sys/poll.h>
 #include <sys/resource.h>
 #include <fs/vfs/vfs.k.h>
@@ -614,6 +614,7 @@ int syscall_ppoll(void *_, struct pollfd *fds, nfds_t nfds, const struct timespe
             pollfd->revents = (uint16_t)status & pollfd->events;
             ret++;
             // unref fd
+            fd->refcount--;
             continue;
         }
 

@@ -18,22 +18,7 @@ if ! [ -d printf ]; then
     curl -Lo printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
 fi
 
-LINUX_VERSION=6.3.3
-
-if ! [ -d linux-headers ]; then
-    curl -Lo linux.tar.xz https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${LINUX_VERSION}.tar.xz
-    tar -xf linux.tar.xz
-    mv linux-* linux-src
-    cd linux-src
-    make ARCH=x86_64 headers_install
-    find usr/include -type f ! -name *.h -delete
-    rm usr/include/linux/libc-compat.h
-    cd ..
-    mv linux-src/usr/include linux-headers
-    rm -rf linux.tar.xz linux-src
-fi
-
-MLIBC_VERSION=a150c6cdf30032a17b816ca010f892244ad591d2
+MLIBC_VERSION=bfcdb855c1cff1f31dfa8deea1a395fdea79cb34
 
 if ! [ -d mlibc-headers ]; then
     curl -Lo mlibc.tar.gz https://github.com/managarm/mlibc/archive/${MLIBC_VERSION}.tar.gz
@@ -47,7 +32,6 @@ if ! [ -d mlibc-headers ]; then
         -Ddisable_crypt_option=true \
         -Ddisable_iconv_option=true \
         -Ddisable_intl_option=true \
-        -Dlinux_kernel_headers=../linux-headers \
         ../mlibc-${MLIBC_VERSION}
     ninja
     mkdir ../mlibc-headers-out

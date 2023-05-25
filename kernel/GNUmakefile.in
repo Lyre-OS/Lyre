@@ -86,7 +86,6 @@ override CFLAGS += \
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
     -I'$(call SHESCAPE,$(SRCDIR))/mlibc-headers' \
-    -I'$(call SHESCAPE,$(SRCDIR))/linux-headers' \
     -I'$(call SHESCAPE,$(SRCDIR))/freestanding-headers' \
     -I'$(call SHESCAPE,$(SRCDIR))' \
     $(CPPFLAGS) \
@@ -204,7 +203,7 @@ dist:
 # Remove ALL generated files.
 .PHONY: maintainer-clean
 maintainer-clean: distclean
-	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf printf flanterm mlibc-headers linux-headers freestanding-headers libgcc-binaries freestanding-toolchain limine.h configure build-aux *'~' autom4te.cache
+	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf printf flanterm mlibc-headers freestanding-headers libgcc-binaries freestanding-toolchain limine.h configure build-aux *'~' autom4te.cache
 
 # Install files and executables to the final locations.
 .PHONY: install

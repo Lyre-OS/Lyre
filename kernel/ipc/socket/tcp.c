@@ -5,11 +5,10 @@
 #include <lib/errno.k.h>
 #include <lib/print.k.h>
 #include <lib/random.k.h>
-#include <linux/tcp.h>
-#include <linux/sockios.h>
+#include <lyre/sockios.h>
 #include <netinet/in.h>
 #include <sched/sched.k.h>
-#include <sys/ioctl.h>
+// #include <sys/ioctl.h>
 #include <time/time.k.h>
 
 // XXX: Poll events may not be correct
@@ -1578,13 +1577,13 @@ ssize_t tcp_getsockopt(struct socket *_this, struct f_description *description, 
             break;
         case IPPROTO_TCP:
             switch (optname) {
-                case TCP_MAXSEG:
-                    if (*optlen < sizeof(int)) {
-                        errno = EINVAL;
-                        return -1;
-                    }
-                    *((int *)optval) = this->maxseg;
-                    break;
+                // case TCP_MAXSEG:
+                //     if (*optlen < sizeof(int)) {
+                //         errno = EINVAL;
+                //         return -1;
+                //     }
+                //     *((int *)optval) = this->maxseg;
+                //     break;
                 default:
                     errno = EINVAL;
                     return -1;
@@ -1606,13 +1605,13 @@ ssize_t tcp_setsockopt(struct socket *_this, struct f_description *description, 
             break;
         case IPPROTO_TCP:
             switch (optname) {
-                case TCP_MAXSEG:
-                    if (optlen < sizeof(int)) {
-                        errno = EINVAL;
-                        return -1;
-                    }
-                    this->maxseg = *((int *)optval);
-                    break;
+                // case TCP_MAXSEG:
+                //     if (optlen < sizeof(int)) {
+                //         errno = EINVAL;
+                //         return -1;
+                //     }
+                //     this->maxseg = *((int *)optval);
+                //     break;
                 default:
                     errno = EINVAL;
                     return -1;
@@ -1637,11 +1636,11 @@ int tcp_sockioctl(struct resource *_this, struct f_description *description, uin
 
             *((int *)arg) = this->rcvbuf.pos;
             return 0;
-        case SIOCGSTAMP:
-            struct timeval *val = (struct timeval *)arg;
-            val->tv_sec = this->recenttimestamp;
-            val->tv_usec = 0;
-            return 0;
+        // case SIOCGSTAMP:
+            // struct timeval *val = (struct timeval *)arg;
+            // val->tv_sec = this->recenttimestamp;
+            // val->tv_usec = 0;
+            // return 0;
     }
 
     return net_ifioctl(_this, description, request, arg);

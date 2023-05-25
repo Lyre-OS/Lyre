@@ -2,10 +2,10 @@
 #include <dev/net/net.k.h>
 #include <lib/errno.k.h>
 #include <lib/print.k.h>
-#include <linux/sockios.h>
+#include <lyre/sockios.h>
 #include <ipc/socket.k.h>
 #include <netinet/in.h>
-#include <sys/ioctl.h>
+// #include <sys/ioctl.h>
 #include <time/time.k.h>
 
 // XXX: Poll events may not be correct
@@ -543,11 +543,11 @@ int udp_sockioctl(struct resource *_this, struct f_description *description, uin
 
             *((int *)arg) = this->packets.length;
             return 0;
-        case SIOCGSTAMP:
-            struct timeval *val = (struct timeval *)arg;
-            val->tv_sec = this->recenttimestamp;
-            val->tv_usec = 0;
-            return 0;
+        // case SIOCGSTAMP:
+            // struct timeval *val = (struct timeval *)arg;
+            // val->tv_sec = this->recenttimestamp;
+            // val->tv_usec = 0;
+            // return 0;
     }
 
     return net_ifioctl(_this, description, request, arg);

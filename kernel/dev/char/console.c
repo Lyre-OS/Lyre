@@ -17,7 +17,8 @@
 #include <sys/int_events.k.h>
 #include <sched/sched.k.h>
 #include <termios.h>
-#include <sys/ioctl.h>
+#include <asm/ioctls.h>
+// #include <sys/ioctl.h>
 #include <sys/ttydefaults.h>
 #include <poll.h>
 #include <flanterm/backends/fb.h>
