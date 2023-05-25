@@ -5,9 +5,5 @@ tarball_blake2b="8d799f7c595f878b9af5b17a490021dd8b8300ac2fe0ed8574c012929d22d2d
 hostdeps="autoconf automake libtool pkg-config"
 
 regenerate() {
-    BINUTILS_CONFIG_PATH="$(realpath ./config)"
-    for f in $(find . -name configure.ac); do
-        ( cd $(dirname $f) && libtoolize -cfvi && autoreconf -fvi -I$BINUTILS_CONFIG_PATH )
-    done
-    unset BINUTILS_CONFIG_PATH
+    autotools_recursive_regen -I"$(realpath ./config)"
 }
