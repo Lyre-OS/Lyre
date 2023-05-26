@@ -1,17 +1,8 @@
 diff --git mesa-clean/include/drm-uapi/drm.h mesa-workdir/include/drm-uapi/drm.h
-index 5e54c3a..c09eec9 100644
+index 5e54c3a..085b5b7 100644
 --- mesa-clean/include/drm-uapi/drm.h
 +++ mesa-workdir/include/drm-uapi/drm.h
-@@ -37,14 +37,15 @@
- 
- #if   defined(__linux__)
- 
-+#include <sys/ioctl.h>
- #include <linux/types.h>
--#include <asm/ioctl.h>
-+//#include <asm/ioctl.h>
- typedef unsigned int drm_handle_t;
- 
+@@ -44,7 +44,7 @@ typedef unsigned int drm_handle_t;
  #else /* One of the BSDs */
  
  #include <stdint.h>
@@ -20,28 +11,6 @@ index 5e54c3a..c09eec9 100644
  #include <sys/types.h>
  typedef int8_t   __s8;
  typedef uint8_t  __u8;
-diff --git mesa-clean/meson.build mesa-workdir/meson.build
-index 07c77e1..ec3aa28 100644
---- mesa-clean/meson.build
-+++ mesa-workdir/meson.build
-@@ -27,7 +27,7 @@ project(
-   ).stdout(),
-   license : 'MIT',
-   meson_version : '>= 0.52',
--  default_options : ['buildtype=debugoptimized', 'b_ndebug=if-release', 'c_std=c11', 'cpp_std=c++14']
-+  default_options : ['buildtype=debugoptimized', 'b_ndebug=if-release', 'c_std=gnu11', 'cpp_std=c++14']
- )
- 
- cc = meson.get_compiler('c')
-@@ -176,7 +176,7 @@ with_any_opengl = with_opengl or with_gles1 or with_gles2
- # Only build shared_glapi if at least one OpenGL API is enabled
- with_shared_glapi = with_shared_glapi and with_any_opengl
- 
--system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'sunos'].contains(host_machine.system())
-+system_has_kms_drm = ['openbsd', 'netbsd', 'freebsd', 'gnu/kfreebsd', 'dragonfly', 'linux', 'lyre', 'sunos'].contains(host_machine.system())
- 
- dri_drivers = get_option('dri-drivers')
- if dri_drivers.contains('auto')
 diff --git mesa-clean/src/compiler/spirv/spirv_to_nir.c mesa-workdir/src/compiler/spirv/spirv_to_nir.c
 index 71cdc83..3d26705 100644
 --- mesa-clean/src/compiler/spirv/spirv_to_nir.c
@@ -115,52 +84,6 @@ index 6506948..a631d69 100644
 +#endif
  
  #endif /* DETECT_OS_H */
-diff --git mesa-clean/src/util/futex.h mesa-workdir/src/util/futex.h
-index 43097f4..dfcbaa1 100644
---- mesa-clean/src/util/futex.h
-+++ mesa-workdir/src/util/futex.h
-@@ -31,25 +31,27 @@
- #include <stdint.h>
- #include <unistd.h>
- #include <linux/futex.h>
--#include <sys/syscall.h>
-+#include <lyre/syscall.h>
- #include <sys/time.h>
- 
--static inline long sys_futex(void *addr1, int op, int val1, const struct timespec *timeout, void *addr2, int val3)
--{
--   return syscall(SYS_futex, addr1, op, val1, timeout, addr2, val3);
--}
-+static inline int futex_wait(uint32_t *pointer, int32_t expected, const struct timespec *timeout) {
-+    struct __syscall_ret ret = __syscall(SYS_futex_wait, pointer, expected, timeout);
- 
--static inline int futex_wake(uint32_t *addr, int count)
--{
--   return sys_futex(addr, FUTEX_WAKE, count, NULL, NULL, 0);
-+    if ((int)ret.ret == -1)
-+        return ret.errno;
-+
-+    return 0;
- }
- 
--static inline int futex_wait(uint32_t *addr, int32_t value, const struct timespec *timeout)
--{
--   /* FUTEX_WAIT_BITSET with FUTEX_BITSET_MATCH_ANY is equivalent to
--    * FUTEX_WAIT, except that it treats the timeout as absolute. */
--   return sys_futex(addr, FUTEX_WAIT_BITSET, value, timeout, NULL,
--                    FUTEX_BITSET_MATCH_ANY);
-+static inline int futex_wake(uint32_t *pointer, int count) {
-+    struct __syscall_ret ret = __syscall(SYS_futex_wake, pointer);
-+
-+    if ((int)ret.ret == -1)
-+        return ret.errno;
-+
-+    int num_woken = ret.ret;
-+
-+    return num_woken;
- }
- 
- #elif defined(__FreeBSD__)
 diff --git mesa-clean/src/util/os_misc.c mesa-workdir/src/util/os_misc.c
 index 31f1c55..0095e53 100644
 --- mesa-clean/src/util/os_misc.c
