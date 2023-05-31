@@ -10,7 +10,8 @@ configure() {
         --sysconfdir=/etc \
         --localstatedir=/var \
         --prefix=${prefix} \
-        --host=x86_64-lyre
+        --host=x86_64-lyre \
+        --disable-static
 }
 
 build() {

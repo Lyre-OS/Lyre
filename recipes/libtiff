@@ -11,6 +11,7 @@ configure() {
         --sysconfdir=/etc \
         --localstatedir=/var \
         --disable-static \
+        --with-sysroot=${sysroot_dir} \
         --enable-shared \
         --without-x \
         --enable-zlib \
