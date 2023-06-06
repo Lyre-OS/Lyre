@@ -11,8 +11,12 @@ configure() {
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
-        --enable-all \
-        --disable-uefi-aarch64 \
+        --enable-uefi-ia32 \
+        --enable-uefi-x86-64 \
+        --enable-uefi-cd \
+        --enable-bios \
+        --enable-bios-cd \
+        --enable-bios-pxe \
         TOOLCHAIN_FOR_TARGET=x86_64-lyre
 }
 
