@@ -454,6 +454,7 @@ void console_init(void) {
 
         term_context = flanterm_fb_init(
             alloc,
+            (void *)free,
             fb->address, fb->width, fb->height, fb->pitch,
             NULL,
             NULL, NULL,
