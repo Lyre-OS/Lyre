@@ -18,16 +18,16 @@ cp initramfs.tar iso_root/boot/
 cp build-support/limine.cfg iso_root/boot/
 
 # Install the limine binaries.
-cp host-pkgs/limine/usr/local/share/limine/limine.sys iso_root/boot/
-cp host-pkgs/limine/usr/local/share/limine/limine-cd.bin iso_root/boot/
-cp host-pkgs/limine/usr/local/share/limine/limine-cd-efi.bin iso_root/boot/
+cp host-pkgs/limine/usr/local/share/limine/limine-bios.sys iso_root/boot/
+cp host-pkgs/limine/usr/local/share/limine/limine-bios-cd.bin iso_root/boot/
+cp host-pkgs/limine/usr/local/share/limine/limine-uefi-cd.bin iso_root/boot/
 mkdir -pv iso_root/EFI/BOOT
 cp host-pkgs/limine/usr/local/share/limine/BOOT*.EFI iso_root/EFI/BOOT/
 
 # Create the disk image.
-xorriso -as mkisofs -b boot/limine-cd.bin -no-emul-boot -boot-load-size 4 \
-    -boot-info-table --efi-boot boot/limine-cd-efi.bin -efi-boot-part \
+xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 \
+    -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part \
     --efi-boot-image --protective-msdos-label iso_root -o lyre.iso
 
 # Install limine.
-host-pkgs/limine/usr/local/bin/limine-deploy lyre.iso
+host-pkgs/limine/usr/local/bin/limine bios-install lyre.iso
