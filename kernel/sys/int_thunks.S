@@ -100,7 +100,7 @@ isr_thunks:
 
 .global panic_ipi_entry
 panic_ipi_entry:
-    lock incq (panic_cpu_counter)
+    lock incq panic_cpu_counter(%rip)
  .hcf:
     hlt
     jmp .hcf

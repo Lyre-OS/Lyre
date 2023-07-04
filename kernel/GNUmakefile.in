@@ -80,8 +80,7 @@ override CFLAGS += \
     -fno-stack-protector \
     -fno-stack-check \
     -fno-lto \
-    -fno-PIE \
-    -fno-PIC
+    -fPIE
 
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
@@ -101,17 +100,6 @@ override CPPFLAGS := \
 $(call MKESCAPE,$(BUILDDIR))/./flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
-# Internal linker flags that should not be changed by the user.
-override LDFLAGS += \
-    -nostdlib \
-    -static \
-    -z max-page-size=0x1000 \
-    -T '$(call SHESCAPE,$(SRCDIR)/linker-$(ARCH).ld)'
-
-ifeq ($(LD_HAS_NO_PIE),yes)
-    override LDFLAGS += -no-pie
-endif
-
 # Set archtecture specific variables (and check that the architecture is supported).
 ifeq ($(ARCH),x86_64)
     override CFLAGS += \
@@ -122,14 +110,23 @@ ifeq ($(ARCH),x86_64)
         -mno-mmx \
         -mno-sse \
         -mno-sse2 \
-        -mno-red-zone \
-        -mcmodel=kernel
+        -mno-red-zone
     override LDFLAGS += \
         -m elf_x86_64
     override LIBGCC := x86_64-no-red-zone
 else
     $(error Architecture $(ARCH) not supported)
 endif
+
+# Internal linker flags that should not be changed by the user.
+override LDFLAGS += \
+    -nostdlib \
+    -static \
+    -pie \
+    --no-dynamic-linker \
+    -z text \
+    -z max-page-size=0x1000 \
+    -T '$(call SHESCAPE,$(SRCDIR)/linker-$(ARCH).ld)'
 
 # Use "find" to glob all *.c, *.S, and *.asm files in the tree and obtain the
 # object and header dependency file names.

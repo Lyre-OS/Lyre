@@ -1,4 +1,4 @@
-.section .rodata
+.section .data
 
 .global syscall_table
 syscall_table:

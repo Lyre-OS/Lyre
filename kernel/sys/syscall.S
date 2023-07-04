@@ -38,11 +38,12 @@
     movq $-1, 16(%rsp)
     movq $EINVAL, 24(%rsp)
 
-    cmp syscall_count, %rbx
+    cmp syscall_count(%rip), %rbx
     jae 1f
 
     sti
-    call *syscall_table(,%rbx,8)
+    lea syscall_table(%rip), %rax
+    call *(%rax,%rbx,8)
 
     mov %rax, 16(%rsp)
     mov %gs:0x8, %rax
@@ -89,7 +90,7 @@ syscall_ud_entry:
     add $8, %rsp
     iretq
 2:
-    jmp *(isr_thunks + 0x6 * 0x8)
+    jmp *(isr_thunks + 0x6 * 0x8)(%rip)
 
 .global syscall_sysenter_entry
 syscall_sysenter_entry:
