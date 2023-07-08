@@ -1,7 +1,7 @@
 name=libgcc-binaries
-version=23239a6bea1deb4acad44f3baead8ccf073e6f54
+version=e1f1e4d9727f42e9a82a8f384a126853b7b03818
 tarball_url="https://github.com/mintsuki/libgcc-binaries/archive/${version}.tar.gz"
-tarball_blake2b="2cd84fe0f9877b63d39e69fd9da9879c688b95d80a808fd19fa3023edc57a0d5d339c169280cc2dd1de846e3818f819cd4c4702b950ca5eee5412fed1d723966"
+tarball_blake2b="3e5f3131da754259f58c2c6427fc8534d47c25adfc79d18ff5ea96037b8031caa3e2484ea5e78ddde4547023523a49951e33706384faa3132e296707e244a6d1"
 
 regenerate() {
     true
