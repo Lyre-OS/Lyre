@@ -88,10 +88,10 @@ void *acpi_find_sdt(const char signature[static 4], size_t index) {
             continue;
         }
 
-        kernel_print("acpi: Found '%S' at %lx, length=%lu\n", signature, 4, sdt, sdt->length);
+        kernel_print("acpi: Found '%4s' at %lx, length=%lu\n", signature, sdt, sdt->length);
         return sdt;
     }
 
-    kernel_print("acpi: Could not find '%S'\n", signature, 4);
+    kernel_print("acpi: Could not find '%4s'\n", signature);
     return NULL;
 }
