@@ -1,13 +1,13 @@
 *.o
-*.d
 *.a
 *.elf
 *.hdd
 *.iso
 *.tar.gz
 *.tar.xz
+/obj
 /bin
-/limine.h
+/src/limine.h
 /compile_commands.json
 /freestanding-toolchain
 /toolchain-files
@@ -22,7 +22,6 @@
 /config.log
 /autom4te.cache
 /GNUmakefile
-/symtab.map
-/printf
-/flanterm
+/src/printf
+/src/flanterm
 /mlibc-headers

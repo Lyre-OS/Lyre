@@ -10,12 +10,12 @@ cd "$srcdir"
 [ -f freestanding-toolchain ] || ( curl -Lo freestanding-toolchain https://github.com/mintsuki/freestanding-toolchain/raw/trunk/freestanding-toolchain && chmod +x freestanding-toolchain )
 [ -d freestanding-headers ] || git clone https://github.com/mintsuki/freestanding-headers.git --depth=1
 [ -d libgcc-binaries ] || git clone https://github.com/mintsuki/libgcc-binaries.git --depth=1
-[ -f limine.h ] || curl -Lo limine.h https://github.com/limine-bootloader/limine/raw/trunk/limine.h
-[ -d flanterm ] || git clone https://github.com/mintsuki/flanterm.git --depth=1
-if ! [ -d printf ]; then
-    mkdir printf
-    curl -Lo printf/printf.c https://github.com/eyalroz/printf/raw/master/src/printf/printf.c
-    curl -Lo printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
+[ -f src/limine.h ] || curl -Lo src/limine.h https://github.com/limine-bootloader/limine/raw/trunk/limine.h
+[ -d src/flanterm ] || git clone https://github.com/mintsuki/flanterm.git src/flanterm --depth=1
+if ! [ -d src/printf ]; then
+    mkdir src/printf
+    curl -Lo src/printf/printf.c https://github.com/eyalroz/printf/raw/master/src/printf/printf.c
+    curl -Lo src/printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
 fi
 
 MLIBC_VERSION=74efefb5e9e546adab60a5730d95165334d7ee15
