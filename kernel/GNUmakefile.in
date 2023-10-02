@@ -12,28 +12,27 @@ define DEFAULT_VAR =
 endef
 
 # Import some autoconf variables as make variables.
+# Those beginning with DEFAULT_ are user overridable.
 override ARCH := @ARCH@
 override SRCDIR := @SRCDIR@
-override BUILDDIR := @BUILDDIR@
 override PACKAGE_VERSION := @PACKAGE_VERSION@
 override PACKAGE_TARNAME := @PACKAGE_TARNAME@
 override OUTPUT := bin/$(PACKAGE_TARNAME)
 override TOOLCHAIN_FILE := @TOOLCHAIN_FILE@
 override WERROR_FLAG := @WERROR_FLAG@
 override DEFAULT_CFLAGS := @CFLAGS@
+$(eval $(call DEFAULT_VAR,CFLAGS,$(DEFAULT_CFLAGS)))
 override DEFAULT_CPPFLAGS := @CPPFLAGS@
+$(eval $(call DEFAULT_VAR,CPPFLAGS,$(DEFAULT_CPPFLAGS)))
 override DEFAULT_LDFLAGS := @LDFLAGS@
-
-LYRE_DEBUG ?= @LYRE_DEBUG@
-
-# Autoconf dir variables.
-override prefix := @prefix@
-override datarootdir := @datarootdir@
-
-# Generator executables.
+$(eval $(call DEFAULT_VAR,LDFLAGS,$(DEFAULT_LDFLAGS)))
 override MKDIR_P := @MKDIR_P@
 override INSTALL := @INSTALL@
 override INSTALL_DATA := @INSTALL_DATA@
+override prefix := @prefix@
+override datarootdir := @datarootdir@
+
+LYRE_DEBUG ?= @LYRE_DEBUG@
 
 override GREP := @GREP@
 export GREP
@@ -47,20 +46,10 @@ export AWK
 override SPACE := $(subst ,, )
 MKESCAPE = $(subst $(SPACE),\ ,$(1))
 SHESCAPE = $(subst ','\'',$(1))
-OBJESCAPE = $(subst .a ,.a' ',$(subst .o ,.o' ',$(call SHESCAPE,$(1))))
 
 # Include toolchain file.
 include $(call MKESCAPE,$(TOOLCHAIN_FILE))
 export OBJDUMP
-
-# User controllable CFLAGS.
-$(eval $(call DEFAULT_VAR,CFLAGS,$(DEFAULT_CFLAGS)))
-
-# User controllable CPPFLAGS.
-$(eval $(call DEFAULT_VAR,CPPFLAGS,$(DEFAULT_CPPFLAGS)))
-
-# User controllable linker flags.
-$(eval $(call DEFAULT_VAR,LDFLAGS,$(DEFAULT_LDFLAGS)))
 
 # Internal C flags that should not be changed by the user.
 override CFLAGS += \
@@ -97,7 +86,7 @@ override CPPFLAGS := \
     -MMD \
     -MP
 
-$(call MKESCAPE,$(BUILDDIR))/obj/./flanterm/backends/fb.c.o: override CPPFLAGS += \
+obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
 # Set archtecture specific variables (and check that the architecture is supported).
@@ -129,10 +118,10 @@ override LDFLAGS += \
 
 # Use "find" to glob all *.c, *.S, and *.asm files in the tree and obtain the
 # object and header dependency file names.
-override CFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L . -type f -name '*.c')
-override ASFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L . -type f -name '*.S')
-override OBJ := $(addprefix $(call MKESCAPE,$(BUILDDIR))/obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
-override HEADER_DEPS := $(addprefix $(call MKESCAPE,$(BUILDDIR))/obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
+override CFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L * -type f -name '*.c')
+override ASFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L * -type f -name '*.S')
+override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
+override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
 # Default target.
 .PHONY: all
@@ -140,24 +129,24 @@ all: $(OUTPUT)
 
 # Link rules for the final kernel executable.
 $(OUTPUT): GNUmakefile $(call MKESCAPE,$(SRCDIR))/linker-$(ARCH).ld $(OBJ) $(call MKESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a
-	$(MKDIR_P) bin
-	$(LD) '$(call OBJESCAPE,$(OBJ))' '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' $(LDFLAGS) -o '$(call SHESCAPE,$@)'
-	'$(call SHESCAPE,$(SRCDIR))/gensyms.sh' '$(call SHESCAPE,$@)' > '$(call SHESCAPE,$(BUILDDIR))/obj/symtab.map'
-	$(CC) $(CFLAGS) $(CPPFLAGS) -x c -c '$(call SHESCAPE,$(BUILDDIR))/obj/symtab.map' -o '$(call SHESCAPE,$(BUILDDIR))/obj/symtab.map.o'
-	$(LD) '$(call OBJESCAPE,$(OBJ))' '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' '$(call SHESCAPE,$(BUILDDIR))/obj/symtab.map.o' $(LDFLAGS) -o '$(call SHESCAPE,$@)'
+	$(MKDIR_P) "$$(dirname $@)"
+	$(LD) $(OBJ) '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' $(LDFLAGS) -o $@
+	'$(call SHESCAPE,$(SRCDIR))/gensyms.sh' $@ > obj/symtab.map
+	$(CC) $(CFLAGS) $(CPPFLAGS) -x c -c obj/symtab.map -o obj/symtab.map.o
+	$(LD) $(OBJ) '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' obj/symtab.map.o $(LDFLAGS) -o $@
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
 
 # Compilation rules for *.c files.
-$(call MKESCAPE,$(BUILDDIR))/obj/%.c.o: $(call MKESCAPE,$(SRCDIR))/src/%.c GNUmakefile
-	$(MKDIR_P) "$$(dirname '$(call SHESCAPE,$@)')"
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o '$(call SHESCAPE,$@)'
+obj/%.c.o: $(call MKESCAPE,$(SRCDIR))/src/%.c GNUmakefile
+	$(MKDIR_P) "$$(dirname $@)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
 
 # Compilation rules for *.S files.
-$(call MKESCAPE,$(BUILDDIR))/obj/%.S.o: $(call MKESCAPE,$(SRCDIR))/src/%.S GNUmakefile
-	$(MKDIR_P) "$$(dirname '$(call SHESCAPE,$@)')"
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o '$(call SHESCAPE,$@)'
+obj/%.S.o: $(call MKESCAPE,$(SRCDIR))/src/%.S GNUmakefile
+	$(MKDIR_P) "$$(dirname $@)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
 
 # Remove object files and the final executable.
 .PHONY: clean
