@@ -24,7 +24,7 @@ distro-full: jinx
 
 .PHONY: distro-base
 distro-base: jinx
-	./jinx build base-files kernel init bash coreutils nano less bpkg binutils gcc
+	./jinx build base-files kernel init bash coreutils nano less binutils gcc
 
 .PHONY: run-kvm
 run-kvm: lyre.iso
