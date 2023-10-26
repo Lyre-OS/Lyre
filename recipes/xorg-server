@@ -7,7 +7,7 @@ deps="core-libs xorg-util-macros xorg-proto xcb-proto libxtrans libxshmfence lib
 configure() {
         CFLAGS="-Wno-error=array-bounds ${common_flags}" \
     ${source_dir}/configure \
-        --host=x86_64-lyre \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \

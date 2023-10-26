@@ -14,7 +14,7 @@ configure() {
     cd ..
 
     ${source_dir}/source/configure \
-        --host=x86_64-lyre \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
@@ -33,8 +33,8 @@ install() {
     rmdir "${dest_dir}${prefix}"/sbin
 
     mv "${dest_dir}${prefix}"/bin/icu-config ./icu-config.bak
-    x86_64-lyre-strip "${dest_dir}${prefix}"/bin/*
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/*
     mv ./icu-config.bak "${dest_dir}${prefix}"/bin/icu-config
 
-    x86_64-lyre-strip "${dest_dir}${prefix}"/lib/*so.73.1
+    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/*so.73.1
 }

@@ -9,9 +9,9 @@ configure() {
 }
 
 build() {
-    make -j${parallelism} CC=x86_64-lyre-gcc
+    make -j${parallelism} CC=${OS_TRIPLET}-gcc
 }
 
 install() {
-    make install DESTDIR="${dest_dir}" PREFIX="${prefix}" STRIP=x86_64-lyre-strip
+    make install DESTDIR="${dest_dir}" PREFIX="${prefix}" STRIP=${OS_TRIPLET}-strip
 }

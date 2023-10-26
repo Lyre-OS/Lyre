@@ -10,7 +10,7 @@ configure() {
         --sysconfdir=/etc \
         --localstatedir=/var \
         --prefix=${prefix} \
-        --host=x86_64-lyre \
+        --host=${OS_TRIPLET} \
         --disable-static
 }
 

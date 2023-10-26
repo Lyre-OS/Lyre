@@ -7,7 +7,7 @@ imagedeps="mtools nasm"
 
 configure() {
     ${source_dir}/configure \
-        --host=x86_64-lyre \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \
@@ -17,7 +17,7 @@ configure() {
         --enable-bios \
         --enable-bios-cd \
         --enable-bios-pxe \
-        TOOLCHAIN_FOR_TARGET=x86_64-lyre
+        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
 }
 
 build() {

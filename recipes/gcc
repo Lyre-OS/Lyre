@@ -9,11 +9,11 @@ configure() {
         CXXFLAGS_FOR_TARGET="$CFLAGS" \
         CFLAGS_FOR_TARGET="$CFLAGS" \
     ${source_dir}/configure                 \
-        --host=x86_64-lyre                 \
+        --host=${OS_TRIPLET}                 \
         --prefix=${prefix}                  \
         --sysconfdir=/etc \
         --localstatedir=/var \
-        --target=x86_64-lyre               \
+        --target=${OS_TRIPLET}               \
         --with-sysroot=/                    \
         --with-build-sysroot=${sysroot_dir} \
         --enable-languages=c,c++,lto            \

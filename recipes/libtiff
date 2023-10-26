@@ -6,7 +6,7 @@ deps="core-libs freeglut libjpeg-turbo zlib zstd xz-utils"
 
 configure() {
     ${source_dir}/configure \
-        --host=x86_64-lyre \
+        --host=${OS_TRIPLET} \
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var \

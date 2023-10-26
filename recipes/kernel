@@ -1,12 +1,12 @@
 name=kernel
 from_source=kernel
 revision=1
-deps="core-libs limine"
-hostdeps="gcc binutils"
+hostdeps="gcc autoconf automake libtool pkg-config"
+deps="core-libs"
 
 configure() {
     ${source_dir}/configure \
-        TOOLCHAIN=x86_64-lyre \
+        TOOLCHAIN=${OS_TRIPLET} \
         --prefix=${prefix}
 }
 
