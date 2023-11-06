@@ -41,7 +41,7 @@ if ! [ -d mlibc-headers ]; then
     rm -rf mlibc.tar.gz mlibc-${MLIBC_VERSION} mlibc-build mlibc-headers-out
 fi
 
-mkdir -p build-aux
-cp "$(automake --print-libdir)/install-sh" build-aux
+AUTOMAKE_LIBDIR="$(automake --print-libdir)"
+cp "${AUTOMAKE_LIBDIR}/INSTALL" ./
 
-autoreconf -fvi -Wall
+libtoolize -cfvi -Wall && autoreconf -fvi -Wall
