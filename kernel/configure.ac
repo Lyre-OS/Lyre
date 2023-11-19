@@ -44,6 +44,13 @@ if ! test "x$FIND_FOUND" = "xyes"; then
     AC_MSG_ERROR([find not found, please install find before configuring])
 fi
 
+#if test "x$ARCH" = "xx86_64"; then
+#    AC_CHECK_PROG([NASM_FOUND], [nasm], [yes])
+#    if ! test "x$NASM_FOUND" = "xyes"; then
+#        AC_MSG_ERROR([nasm not found, please install nasm before configuring])
+#    fi
+#fi
+
 AC_ARG_VAR([TOOLCHAIN], [alternative toolchain prefix (or 'llvm', or 'gnu')])
 AC_ARG_VAR([CC], [C compiler command])
 AC_ARG_VAR([LD], [linker command])
@@ -73,6 +80,10 @@ test "x$CFLAGS" = "x" && CFLAGS="DEFAULT_CFLAGS"
 m4_define([DEFAULT_CPPFLAGS], [])
 AC_ARG_VAR([CPPFLAGS], [C preprocessor flags @<:@default: ]DEFAULT_CPPFLAGS[@:>@])
 test "x$CPPFLAGS" = "x" && CPPFLAGS="DEFAULT_CPPFLAGS"
+
+#m4_define([DEFAULT_NASMFLAGS], [-F dwarf -g])
+#AC_ARG_VAR([NASMFLAGS], [nasm flags @<:@default: ]DEFAULT_NASMFLAGS[@:>@])
+#test "x$NASMFLAGS" = "x" && NASMFLAGS="DEFAULT_NASMFLAGS"
 
 m4_define([DEFAULT_LDFLAGS], [])
 AC_ARG_VAR([LDFLAGS], [linker flags @<:@default: ]DEFAULT_LDFLAGS[@:>@])

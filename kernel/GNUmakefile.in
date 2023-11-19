@@ -24,6 +24,10 @@ override DEFAULT_CFLAGS := @CFLAGS@
 $(eval $(call DEFAULT_VAR,CFLAGS,$(DEFAULT_CFLAGS)))
 override DEFAULT_CPPFLAGS := @CPPFLAGS@
 $(eval $(call DEFAULT_VAR,CPPFLAGS,$(DEFAULT_CPPFLAGS)))
+#ifeq ($(ARCH),x86_64)
+#    override DEFAULT_NASMFLAGS := @NASMFLAGS@
+#    $(eval $(call DEFAULT_VAR,NASMFLAGS,$(DEFAULT_NASMFLAGS)))
+#endif
 override DEFAULT_LDFLAGS := @LDFLAGS@
 $(eval $(call DEFAULT_VAR,LDFLAGS,$(DEFAULT_LDFLAGS)))
 override MKDIR_P := @MKDIR_P@
@@ -86,6 +90,13 @@ override CPPFLAGS := \
     -MMD \
     -MP
 
+#ifeq ($(ARCH),x86_64)
+#    # Internal nasm flags that should not be changed by the user.
+#    override NASMFLAGS += \
+#        -Wall \
+#        $(WERROR_FLAG)
+#endif
+
 obj/flanterm/backends/fb.c.o: override CPPFLAGS += \
     -DFLANTERM_FB_DISABLE_BUMP_ALLOC
 
@@ -101,6 +112,8 @@ ifeq ($(ARCH),x86_64)
         -mno-red-zone
     override LDFLAGS += \
         -m elf_x86_64
+#    override NASMFLAGS += \
+#        -f elf64
     override LIBGCC := x86_64-no-red-zone
 else
     $(error Architecture $(ARCH) not supported)
@@ -121,6 +134,10 @@ override LDFLAGS += \
 override CFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L * -type f -name '*.c')
 override ASFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L * -type f -name '*.S')
 override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
+#ifeq ($(ARCH),x86_64)
+#    override NASMFILES := $(shell cd '$(call SHESCAPE,$(SRCDIR))/src' && find -L * -type f -name '*.asm')
+#    override OBJ += $(addprefix obj/,$(NASMFILES:.asm=.asm.o))
+#endif
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
 # Default target.
@@ -147,6 +164,13 @@ obj/%.c.o: $(call MKESCAPE,$(SRCDIR))/src/%.c GNUmakefile
 obj/%.S.o: $(call MKESCAPE,$(SRCDIR))/src/%.S GNUmakefile
 	$(MKDIR_P) "$$(dirname $@)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c '$(call SHESCAPE,$<)' -o $@
+
+#ifeq ($(ARCH),x86_64)
+## Compilation rules for *.asm files.
+#obj/%.asm.o: $(call MKESCAPE,$(SRCDIR))/src/%.asm GNUmakefile
+#	$(MKDIR_P) "$$(dirname $@)"
+#	nasm $(NASMFLAGS) '$(call SHESCAPE,$<)' -o $@
+#endif
 
 # Remove object files and the final executable.
 .PHONY: clean
