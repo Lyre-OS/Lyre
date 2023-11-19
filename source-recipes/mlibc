@@ -1,7 +1,7 @@
 name=mlibc
-version=74efefb5e9e546adab60a5730d95165334d7ee15
+version=3b38e0398a5e85b6602a3bf7922dc35988b20594
 tarball_url="https://github.com/mintsuki/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="1f5301b0c7ac1a7149965b5c651eefe91637ee0f5f44a2e4f289f3bd9828c24803201c629ba2cd5c2f5a33893d1870a1d47e31bd7d7d79c610adf2f6f268fe09"
+tarball_blake2b="de3db7070490f63fa2abf62c1241411513206ab5a59aa414eecd832566935a3c8fe70510bfc13ea37182f29ee440eb0842fc6d8ae3fb04465c35c32765739d72"
 
 regenerate() {
     true
