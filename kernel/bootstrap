@@ -18,7 +18,7 @@ if ! [ -d src/printf ]; then
     curl -Lo src/printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
 fi
 
-MLIBC_VERSION=3b38e0398a5e85b6602a3bf7922dc35988b20594
+MLIBC_VERSION=85862a42dcbfbb231558f4afbc5c816b727a8837
 
 if ! [ -d mlibc-headers ]; then
     curl -Lo mlibc.tar.gz https://github.com/mintsuki/mlibc/archive/${MLIBC_VERSION}.tar.gz
