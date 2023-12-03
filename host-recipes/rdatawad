@@ -14,7 +14,7 @@ build() {
     ninja rdatawad
 }
 
-install() {
+package() {
     mkdir -p "${dest_dir}${prefix}"/rdatawad
     cp -v data/rdatawad "${dest_dir}${prefix}"/rdatawad/rdatawad
     sed -e "s|$(pwd)/data|${dest_dir}${prefix}/rdatawad|" ImportExecutables.cmake > "${dest_dir}${prefix}"/rdatawad/ImportExecutables.cmake

@@ -23,7 +23,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     make install DESTDIR="${dest_dir}"
 
     # As we build ncurses with wide character support, make some compatibility links

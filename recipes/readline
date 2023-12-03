@@ -17,7 +17,7 @@ build() {
     make SHLIB_LIBS="-lncursesw" -j${parallelism}
 }
 
-install() {
+package() {
     make SHLIB_LIBS="-lncursesw" install DESTDIR="${dest_dir}"
 
     ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libhistory.so.8

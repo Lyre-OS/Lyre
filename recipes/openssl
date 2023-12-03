@@ -20,7 +20,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     # Disable installing static libraries.
     sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile
 

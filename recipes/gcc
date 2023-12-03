@@ -27,7 +27,7 @@ build() {
     make -j${parallelism} all-gcc
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip-gcc
 
     ln -s gcc "${dest_dir}${prefix}"/bin/cc

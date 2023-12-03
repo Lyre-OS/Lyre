@@ -16,7 +16,7 @@ build() {
     make
 }
 
-install() {
+package() {
     make strip
     DESTDIR="${dest_dir}" make install
 }

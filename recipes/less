@@ -14,7 +14,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     make install DESTDIR="${dest_dir}"
     # We strip it manually because install-strip is broken.
     ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/less

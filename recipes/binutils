@@ -24,7 +24,7 @@ build() {
     make -j${parallelism} all
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
 
     # Remove unnecessary directory

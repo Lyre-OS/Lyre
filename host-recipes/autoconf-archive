@@ -8,7 +8,7 @@ build() {
     true
 }
 
-install() {
+package() {
     mkdir -p "${dest_dir}${prefix}"/share/aclocal
     cp -r "${source_dir}"/m4/. "${dest_dir}${prefix}"/share/aclocal/
 }

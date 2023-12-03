@@ -17,7 +17,7 @@ build() {
     ninja
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" ninja install
 
     ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/{gapplication,gdbus,gio,gio-querymodules,glib-compile-resources,glib-compile-schemas,gobject-query,gresource,gsettings,gtester}

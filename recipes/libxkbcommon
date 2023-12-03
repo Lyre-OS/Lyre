@@ -19,7 +19,7 @@ build() {
     ninja
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" ninja install
     mkdir -p "${dest_dir}${prefix}/share/X11/xkb"
 

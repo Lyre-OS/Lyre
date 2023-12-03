@@ -9,6 +9,6 @@ build() {
     true
 }
 
-install() {
+package() {
     true
 }

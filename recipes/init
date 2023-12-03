@@ -10,6 +10,6 @@ build() {
     make -j${parallelism} CC=${OS_TRIPLET}-gcc
 }
 
-install() {
+package() {
     make install DESTDIR="${dest_dir}" PREFIX="${prefix}" STRIP=${OS_TRIPLET}-strip
 }

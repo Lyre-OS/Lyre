@@ -14,7 +14,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
         CC=${OS_TRIPLET}-gcc \
         DESTDIR="${dest_dir}" \
         PREFIX="${prefix}" \

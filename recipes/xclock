@@ -15,7 +15,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install-strip
     mv -v "${dest_dir}"/sysroot/* "${dest_dir}"/
     rm -rf "${dest_dir}"/sysroot

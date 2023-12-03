@@ -24,7 +24,7 @@ build() {
     make -j${parallelism}
 }
 
-install() {
+package() {
     DESTDIR="${dest_dir}" make install
 
     mv "${dest_dir}${prefix}"/sbin/* "${dest_dir}${prefix}"/bin/

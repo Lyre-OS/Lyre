@@ -11,7 +11,7 @@ build() {
     true
 }
 
-install() {
+package() {
     # Create the required directories
     mkdir -p ${dest_dir}/etc
     mkdir -p ${dest_dir}/usr/share/zoneinfo/posix
