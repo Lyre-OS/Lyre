@@ -4,13 +4,11 @@ revision=1
 hostdeps="autoconf automake"
 imagedeps="help2man gcc"
 
-configure() {
+build() {
     cp -rp "${source_dir}"/. ./
     ./configure \
         --prefix="${prefix}"
-}
 
-build() {
     make -j${parallelism}
 }
 

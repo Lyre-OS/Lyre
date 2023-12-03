@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
 
-configure() {
+build() {
     cp -rp "${source_dir}"/. ./
 
         STRIP=${OS_TRIPLET}-strip \
@@ -41,9 +41,7 @@ configure() {
         --with-tlib=tinfo \
         --enable-gui=no \
         --without-x
-}
 
-build() {
     make -j${parallelism}
 }
 

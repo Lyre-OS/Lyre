@@ -4,12 +4,10 @@ revision=1
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
-configure() {
+build() {
     cp -r ${source_dir}/. .
     sed -i 's/all: libbz2.a bzip2 bzip2recover test/all: libbz2.a bzip2 bzip2recover/g' Makefile
-}
 
-build() {
     make CC=${OS_TRIPLET}-gcc CFLAGS="$CFLAGS -fPIC" -f Makefile-libbz2_so
     make clean
     make CC=${OS_TRIPLET}-gcc AR=${OS_TRIPLET}-ar CFLAGS="$CFLAGS -fPIC" -j${parallelism}

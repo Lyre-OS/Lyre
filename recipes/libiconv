@@ -5,7 +5,7 @@ hostdeps="gcc autoconf automake libtool pkg-config"
 deps="mlibc libgcc libstdc++"
 imagedeps="binutils"
 
-configure() {
+build() {
     ${source_dir}/configure           \
         --host=${OS_TRIPLET}           \
         --prefix=${prefix}            \
@@ -14,9 +14,7 @@ configure() {
         --disable-static              \
         --enable-shared               \
         --disable-nls
-}
 
-build() {
     make -j${parallelism}
 }
 

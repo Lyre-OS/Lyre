@@ -5,7 +5,7 @@ imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs glib"
 
-configure() {
+build() {
     meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
@@ -13,9 +13,7 @@ configure() {
         --buildtype=release \
         -Dintrospection=false \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 

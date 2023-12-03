@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs readline zlib"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
@@ -14,9 +14,7 @@ configure() {
         --enable-readline \
         --enable-fts5 \
         CFLAGS="$CFLAGS -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS4=1 -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_UNLOCK_NOTIFY=1 -DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_SECURE_DELETE=1 -DSQLITE_ENABLE_FTS3_TOKENIZER=1"
-}
 
-build() {
     make -j${parallelism}
 }
 

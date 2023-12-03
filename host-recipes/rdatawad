@@ -3,16 +3,14 @@ from_source=dsda-doom
 revision=1
 imagedeps="gcc cmake ninja git"
 
-configure() {
+build() {
     cmake \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_RDATAWAD_ONLY=ON \
         -DBUILD_GL=OFF \
         ${source_dir}/prboom2
-}
 
-build() {
     ninja rdatawad
 }
 

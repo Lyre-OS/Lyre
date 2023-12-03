@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freeglut libjpeg-turbo zlib zstd xz-utils"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
@@ -20,9 +20,7 @@ configure() {
         --enable-lzma \
         --disable-webp \
         --enable-cxx
-}
 
-build() {
     make -j${parallelism}
 }
 

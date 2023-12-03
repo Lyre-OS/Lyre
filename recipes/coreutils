@@ -5,7 +5,7 @@ hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs tzdata"
 imagedeps="gcc gperf"
 
-configure() {
+build() {
     cp -rp "${source_dir}"/. ./
 
         CFLAGS="-DSLOW_BUT_NO_HACKS $CFLAGS" \
@@ -15,9 +15,7 @@ configure() {
         --sysconfdir=/etc \
         --localstatedir=/var \
         --disable-nls
-}
 
-build() {
     make -j${parallelism}
 }
 

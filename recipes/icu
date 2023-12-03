@@ -5,7 +5,7 @@ imagedeps="gcc"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-configure() {
+build() {
     mkdir cross-build
     cd cross-build
     ${source_dir}/source/configure \
@@ -20,9 +20,7 @@ configure() {
         --localstatedir=/var \
         --disable-static \
         --with-cross-build=$(realpath cross-build)
-}
 
-build() {
     make -j${parallelism}
 }
 

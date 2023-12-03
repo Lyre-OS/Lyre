@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc pkg-config"
 deps="core-libs zlib"
 
-configure() {
+build() {
         CC=${OS_TRIPLET}-gcc \
         CXX=${OS_TRIPLET}-g++ \
         AR=${OS_TRIPLET}-ar \
@@ -16,9 +16,7 @@ configure() {
         shared \
         zlib-dynamic \
         no-afalgeng
-}
 
-build() {
     make -j${parallelism}
 }
 

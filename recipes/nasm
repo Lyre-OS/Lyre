@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs"
 
-configure() {
+build() {
     cp -rp "${source_dir}"/. ./
 
     ./configure \
@@ -12,9 +12,7 @@ configure() {
         --prefix=${prefix} \
         --sysconfdir=/etc \
         --localstatedir=/var
-}
 
-build() {
     make
 }
 

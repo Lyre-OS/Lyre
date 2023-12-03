@@ -5,7 +5,7 @@ imagedeps="gcc ninja git"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxxf86vm mesa"
 
-configure() {
+build() {
     cmake \
         -GNinja \
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
@@ -46,9 +46,7 @@ configure() {
         -DSDL_SHARED=ON \
         -DSDL_STATIC=OFF \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 

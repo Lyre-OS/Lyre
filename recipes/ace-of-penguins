@@ -5,16 +5,14 @@ imagedeps="gcc libpng"
 hostdeps="gcc autoconf automake pkg-config libtool"
 deps="core-libs libx11 libxpm libpng zlib"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --sysconfdir=/etc \
         --localstatedir=/var \
         --prefix=${prefix} \
         --host=${OS_TRIPLET} \
         --disable-static
-}
 
-build() {
     make -j${parallelism}
 }
 

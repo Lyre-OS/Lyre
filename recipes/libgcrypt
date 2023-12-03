@@ -5,7 +5,7 @@ imagedeps="gcc"
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="core-libs libgpg-error"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
@@ -17,9 +17,7 @@ configure() {
         --disable-dev-random \
         --disable-asm \
         --with-libgpg-error-prefix=${sysroot_dir}/${prefix}
-}
 
-build() {
     make -j${parallelism}
 }
 

@@ -4,7 +4,7 @@ revision=1
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs freetype mesa glu libx11 libxext"
 
-configure() {
+build() {
     ${source_dir}/configure \
         --host=${OS_TRIPLET} \
         --prefix=${prefix} \
@@ -17,9 +17,7 @@ configure() {
         --disable-libdrm \
         --with-system-data-files \
         --with-glut=no
-}
 
-build() {
     make -j${parallelism}
 }
 

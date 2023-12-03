@@ -5,7 +5,7 @@ imagedeps="gcc ninja python git"
 hostdeps="gcc cmake pkg-config"
 deps="core-libs"
 
-configure() {
+build() {
     cmake \
         -GNinja \
         -DCMAKE_TOOLCHAIN_FILE=${base_dir}/build-support/CMakeToolchain.txt \
@@ -16,9 +16,7 @@ configure() {
         -DWITH_JPEGS=ON \
         -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 

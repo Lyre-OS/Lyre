@@ -3,11 +3,9 @@ from_source=neofetch
 revision=1
 rundeps="bash"
 
-configure() {	
+build() {	
     true
-}
 
-build() {
     true
 }
 

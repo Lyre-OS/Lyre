@@ -3,11 +3,9 @@ from_source=cmake
 revision=1
 imagedeps="gcc"
 
-configure() {
-    "${source_dir}"/configure --prefix="${prefix}" --parallel="${parallelism}"
-}
-
 build() {
+    "${source_dir}"/configure --prefix="${prefix}" --parallel="${parallelism}"
+
     make -j${parallelism}
 }
 

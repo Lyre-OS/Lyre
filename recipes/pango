@@ -5,7 +5,7 @@ imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs glib fontconfig freetype fribidi cairo xorg-proto libx11 libxtrans libxext harfbuzz libxft"
 
-configure() {
+build() {
     meson setup \
         --cross-file ${base_dir}/build-support/cross_file.txt \
         --prefix=${prefix} \
@@ -13,9 +13,7 @@ configure() {
         --buildtype=release \
         -Dintrospection=disabled \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 

@@ -5,11 +5,9 @@ imagedeps="tzdata"
 hostdeps="gcc binutils"
 deps="core-libs"
 
-configure() {
-    cp -r ${source_dir}/. ./
-}
-
 build() {
+    cp -r ${source_dir}/. ./
+
     true
 }
 

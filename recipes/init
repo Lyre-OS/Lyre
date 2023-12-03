@@ -4,11 +4,9 @@ revision=1
 deps="core-libs"
 hostdeps="gcc"
 
-configure() {
-    cp -r ${source_dir}/. ./
-}
-
 build() {
+    cp -r ${source_dir}/. ./
+
     make -j${parallelism} CC=${OS_TRIPLET}-gcc
 }
 

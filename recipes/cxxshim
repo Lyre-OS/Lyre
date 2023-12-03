@@ -3,16 +3,14 @@ from_source=cxxshim
 revision=1
 imagedeps="meson ninja git base-devel"
 
-configure() {
+build() {
     meson setup \
         --prefix=${prefix} \
         --libdir=lib \
         --includedir=share/cxxshim/include \
         -Dinstall_headers=true \
         ${source_dir}
-}
 
-build() {
     ninja
 }
 

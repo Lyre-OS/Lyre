@@ -2,11 +2,9 @@ name=base-files
 from_source=base-files
 revision=1
 
-configure() {
-    true
-}
-
 build() {
+    true
+
     true
 }
 
