@@ -6,7 +6,7 @@ all:
 	$(MAKE) lyre.iso
 
 lyre.iso: jinx
-	rm -f builds/kernel.built builds/kernel.installed
+	rm -f builds/kernel.built builds/kernel.packaged
 	$(MAKE) distro-base
 	./build-support/makeiso.sh
 
@@ -15,7 +15,7 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -o jinx https://raw.githubusercontent.com/mintsuki/jinx/trunk/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/ba9f68465334cd045e06f42dab861764a39234f3/jinx
 	chmod +x jinx
 
 .PHONY: distro-full
