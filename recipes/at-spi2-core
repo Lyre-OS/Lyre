@@ -1,27 +1,22 @@
 name=at-spi2-core
-from_source=at-spi2-core
+version=2.48.3
 revision=1
+tarball_url="https://download.gnome.org/sources/at-spi2-core/2.48/at-spi2-core-${version}.tar.xz"
+tarball_blake2b="9692df8cc0bc8de82f6e339b9358be7ab1bc598afdb39503f5f05ca772109b962a513fe2ef79d8f094ea732457225409f3c765784a54cbabf27b8fc72c893eb9"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs dbus glib libxml"
 
 build() {
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --libdir=lib \
-        --buildtype=release \
+    meson_configure \
         -Dsystemd_user_dir=/tmp \
-        -Dintrospection=disabled \
-        ${source_dir}
+        -Dintrospection=disabled
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {
     DESTDIR="${dest_dir}" ninja install
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{gtk-2.0/modules/libatk-bridge.so,libatk-1.0.so.0.24811.1,libatk-bridge-2.0.so.0.0.0,libatspi.so.0.0.1}
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/libexec/*
+    post_package_strip
 }

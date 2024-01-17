@@ -1,8 +1,10 @@
 name=zstd
-from_source=zstd
+version=1.5.5
 revision=1
+tarball_url="https://github.com/facebook/zstd/releases/download/v${version}/zstd-${version}.tar.gz"
+tarball_blake2b="7680e27a0adacfb809d9fc81e06d3f99bf74df30374d3b5cb2d58f667dd1b7d5c41697e608592709e17c0e32277f20a6d615edee409b5d7cdcb15da2799a2350"
 hostdeps="gcc pkg-config"
-deps="core-libs zlib xz-utils"
+deps="core-libs zlib xz"
 
 build() {
     cp -rp "${source_dir}"/. ./
@@ -23,7 +25,5 @@ package() {
     # Remove static libraries.
     rm -rf "${dest_dir}${prefix}"/lib/*.a
 
-    # Strip executables.
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libzstd.so.1.5.5
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/zstd
+    post_package_strip
 }

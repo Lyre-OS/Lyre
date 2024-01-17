@@ -1,27 +1,22 @@
 name=gdk-pixbuf
-from_source=gdk-pixbuf
+version=2.42.10
 revision=1
+tarball_url="https://download.gnome.org/sources/gdk-pixbuf/2.42/gdk-pixbuf-${version}.tar.xz"
+tarball_blake2b="b6bec388b70a971ea5b336001920fdf433bcbc539d54e62c7b6198e968f0bd3560ef9adc94215b64b01e7d5db69c95d5a1d32654b38b051fceb75e93666b3385"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs glib libjpeg-turbo libpng libx11 libtiff"
 
 build() {
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
-        --libdir=lib \
-        --buildtype=release \
+    meson_configure \
         -Dgio_sniffing=false \
-        -Dman=false \
-        ${source_dir}
+        -Dman=false
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {
     DESTDIR="${dest_dir}" ninja install
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/gdk-pixbuf-2.0/2.10.0/loaders/*
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/libgdk_pixbuf-2.0.so.0.4200.10
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/*
+    post_package_strip
 }

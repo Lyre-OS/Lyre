@@ -1,20 +1,24 @@
 name=libarchive
-from_source=libarchive
+version=3.6.2
 revision=1
+tarball_url="https://github.com/libarchive/libarchive/releases/download/v${version}/libarchive-${version}.tar.xz"
+tarball_blake2b="355b5d402e352dee802513485ce7e047af58d6de5b9bf6a49f3fd8d7b94117007598820ac979585c0da79747e8b63b70ab151131182368a11f97a047cf9029d4"
+source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs zlib xz-utils zstd libexpat libxml"
+deps="core-libs zlib xz zstd libexpat libxml"
+
+regenerate() {
+    autotools_recursive_regen
+}
 
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static
+    autotools_configure
 
     make -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
 }

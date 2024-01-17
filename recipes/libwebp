@@ -1,17 +1,18 @@
 name=libwebp
-from_source=libwebp
+version=1.3.0
 revision=1
+tarball_url="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${version}.tar.gz"
+tarball_blake2b="91ca9a2db3a80416a39ae81b47918e6c8b718eafba677b6976e344817a847e0ed55ffe1492d723decfa052a0f63f057f61fb24918b31f94d58835b50a4c3acf8"
+source_hostdeps="automake autoconf libtool pkg-config"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libjpeg-turbo libpng freeglut sdl2 libtiff"
 
+regenerate() {
+    autotools_recursive_regen
+}
+
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-static \
-        --with-sysroot=${sysroot_dir} \
+    autotools_configure \
         --enable-libwebpmux \
         --enable-libwebpdemux \
         --enable-libwebpdecoder \
@@ -22,5 +23,7 @@ build() {
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
 }

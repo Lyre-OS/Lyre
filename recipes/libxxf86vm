@@ -1,21 +1,25 @@
 name=libxxf86vm
-from_source=libxxf86vm
+version=1.1.5
 revision=1
+tarball_url="https://www.x.org/archive/individual/lib/libXxf86vm-${version}.tar.gz"
+tarball_blake2b="396676748546bf2903a9d5ee8603babc04634d6547b38baed07134a7fea81f1691c064c07a9cc4990aeaf1edc911b586b5e11c449aa7872c1ea5b46879029f5e"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-util-macros xorg-proto libx11 libxtrans libxext"
+deps="core-libs xorg-proto libxext"
+
+regenerate() {
+    autotools_recursive_regen
+}
 
 build() {
-    ${source_dir}/configure           \
-        --host=${OS_TRIPLET}           \
-        --prefix=${prefix}            \
-        --sysconfdir=/etc             \
-        --localstatedir=/var          \
-        --disable-static              \
-        --disable-malloc0returnsnull
+    autotools_configure
 
     make -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
 }

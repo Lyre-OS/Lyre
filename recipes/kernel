@@ -1,17 +1,26 @@
 name=kernel
-from_source=kernel
+version=0.0
 revision=1
+source_dir="kernel"
+source_imagedeps="git meson ninja"
+source_hostdeps="automake autoconf libtool pkg-config"
+source_allow_network="yes"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
+regenerate() {
+    ./bootstrap
+}
+
 build() {
-    ${source_dir}/configure \
-        TOOLCHAIN=${OS_TRIPLET} \
-        --prefix=${prefix}
+    autotools_configure \
+        TOOLCHAIN=${OS_TRIPLET}
 
     make -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
 }

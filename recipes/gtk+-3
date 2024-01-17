@@ -1,35 +1,30 @@
 name=gtk+-3
-from_source=gtk+-3
+version=3.24.37
 revision=1
+tarball_url="https://download.gnome.org/sources/gtk%2B/3.24/gtk%2B-${version}.tar.xz"
+tarball_blake2b="1cffcf0066f0f9d42fd01d9cf0dbab2465bf749fe70ebe24a843807c77b696047cbb739fead7f7872833ee562439d96857d02b3037b949babaa3797482104fda"
 imagedeps="meson ninja gdk-pixbuf2"
 hostdeps="gcc pkg-config"
-deps="core-libs atk at-spi2-atk cairo glib gdk-pixbuf libx11 libxext libxcb libxrender libxrandr libxfixes libxdamage pango fribidi libepoxy libxkbcommon fontconfig freetype libxi harfbuzz libxcursor gsettings-desktop-schemas dbus"
+deps="core-libs at-spi2-core cairo glib gdk-pixbuf libx11 libxext libxcb libxrender libxrandr libxfixes libxdamage pango fribidi libepoxy libxkbcommon fontconfig freetype2 libxi harfbuzz libxcursor gsettings-desktop-schemas dbus"
 
 build() {
-    meson setup \
-        --cross-file ${base_dir}/build-support/cross_file.txt \
-        --prefix=${prefix} \
-        --libdir=lib \
-        --buildtype=release \
+    meson_configure \
         -Dprint_backends=file \
         -Dintrospection=false \
         -Dx11_backend=true \
         -Dbroadway_backend=true \
         -Dwayland_backend=false \
         -Dgtk_doc=false \
-        -Dcolord=no \
-        ${source_dir}
+        -Dcolord=no
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {
     DESTDIR="${dest_dir}" ninja install
 
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/bin/*
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/{libgailutil-3.so.0.0.0,libgdk-3.so.0.2405.32,libgtk-3.so.0.2405.32}
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/gtk-3.0/3.0.0/immodules/*
-    ${OS_TRIPLET}-strip "${dest_dir}${prefix}"/lib/gtk-3.0/3.0.0/printbackends/*
-
     glib-compile-schemas "${dest_dir}${prefix}"/share/glib-2.0/schemas
+    rm "${dest_dir}${prefix}"/share/glib-2.0/schemas/gschemas.compiled
+
+    post_package_strip
 }

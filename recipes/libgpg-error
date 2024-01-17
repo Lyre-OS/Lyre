@@ -1,22 +1,30 @@
 name=libgpg-error
-from_source=libgpg-error
+version=1.46
 revision=1
+tarball_url="https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-${version}.tar.gz"
+tarball_blake2b="cc6319ad47acdc792634b243aa86920fb675a8df81ea8ef4f8bffcbe15d0688cd0c69ac4b901909186d38e203365d9345ae472d51ac456f7d2cd36d7941c99d6"
+source_hostdeps="automake autoconf libtool pkg-config"
 imagedeps="gcc"
-hostdeps="gcc automake autoconf libtool pkg-config"
+hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
+regenerate() {
+    cp -v src/syscfg/lock-obj-pub.x86_64-unknown-linux-gnu.h src/syscfg/lock-obj-pub.lyre.h
+
+    autotools_recursive_regen
+}
+
 build() {
-    ${source_dir}/configure \
-        --host=${OS_TRIPLET} \
-        --prefix=${prefix} \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-nls \
-        --disable-doc
+    cp -rp "${source_dir}"/. ./
+
+        configure_script_path=./configure \
+    autotools_configure
 
     make -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" make install-strip
+    DESTDIR="${dest_dir}" make install
+
+    post_package_strip
 }

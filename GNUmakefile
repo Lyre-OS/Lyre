@@ -15,7 +15,7 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/87f5e775e91bbcee849f0732fb0b8bfe73c677dd/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/28efd9f86ffbaeccb0f4552a4f1ad85f42fccad0/jinx
 	chmod +x jinx
 
 .PHONY: distro-full
@@ -24,7 +24,7 @@ distro-full: jinx
 
 .PHONY: distro-base
 distro-base: jinx
-	./jinx build base-files kernel init bash coreutils nano less binutils gcc
+	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata xz zlib zstd
 
 .PHONY: run-kvm
 run-kvm: lyre.iso

@@ -1,8 +1,10 @@
 name=llvm
-from_source=llvm
+version=14.0.6
 revision=1
-imagedeps="gcc ninja python git"
-hostdeps="gcc cmake pkg-config"
+tarball_url="https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/llvm-project-${version}.src.tar.xz"
+tarball_blake2b="ee67c5407df8cef493b9c0004f15e428f22a536a17e5f4e3eb29a003b8a8ec0abe0fa3e072591161d5f30ef7d8867c1ce34d1b341ad858e93c00263499941a99"
+imagedeps="gcc ninja python git cmake"
+hostdeps="gcc pkg-config"
 deps="core-libs zlib"
 
 build() {
@@ -21,9 +23,11 @@ build() {
         -Wno-dev \
         ${source_dir}/llvm
 
-    ninja
+    ninja -j${parallelism}
 }
 
 package() {
-    DESTDIR="${dest_dir}" ninja install/strip
+    DESTDIR="${dest_dir}" ninja install
+
+    post_package_strip
 }

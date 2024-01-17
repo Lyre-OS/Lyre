@@ -1,8 +1,9 @@
 name=init
-from_source=init
+version=0.0
 revision=1
-deps="core-libs"
+source_dir="init"
 hostdeps="gcc"
+deps="core-libs"
 
 build() {
     cp -r ${source_dir}/. ./
