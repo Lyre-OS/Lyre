@@ -1,8 +1,8 @@
 diff --git mlibc-clean/abis/linux/in.h mlibc-workdir/abis/linux/in.h
-index 1b07434..6b4d193 100644
+index d06c9e2..004df53 100644
 --- mlibc-clean/abis/linux/in.h
 +++ mlibc-workdir/abis/linux/in.h
-@@ -100,6 +100,10 @@ struct group_source_req {
+@@ -106,6 +106,10 @@ struct group_source_req {
  #define INET_ADDRSTRLEN  16
  #define INET6_ADDRSTRLEN 46
  
@@ -13,6 +13,18 @@ index 1b07434..6b4d193 100644
  #define IPPORT_RESERVED 1024
  
  #define IPPROTO_IP       0
+diff --git mlibc-clean/options/ansi/generic/time-stubs.cpp mlibc-workdir/options/ansi/generic/time-stubs.cpp
+index 887a7d3..823fc81 100644
+--- mlibc-clean/options/ansi/generic/time-stubs.cpp
++++ mlibc-workdir/options/ansi/generic/time-stubs.cpp
+@@ -242,6 +242,7 @@ size_t strftime(char *__restrict dest, size_t max_size,
+ 			c++;
+ 			break;
+ 		}
++		case 'l':
+ 		case 'I': {
+ 			int hour = tm->tm_hour;
+ 			if(!hour)
 diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
 index 3474615..e034881 100644
 --- mlibc-clean/options/glibc/generic/execinfo.cpp
