@@ -6,5 +6,5 @@ alias ls="ls --color=auto"
 
 export DISPLAY=:0
 alias 1="X &"
-alias 2="twm &"
+alias 2="jwm &"
 alias 3="xeyes &"
