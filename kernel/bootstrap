@@ -7,43 +7,89 @@ test -z "$srcdir" && srcdir=.
 
 cd "$srcdir"
 
-[ -f freestanding-toolchain ] || ( curl -Lo freestanding-toolchain https://github.com/mintsuki/freestanding-toolchain/raw/trunk/freestanding-toolchain && chmod +x freestanding-toolchain )
-[ -d freestanding-headers ] || git clone https://github.com/mintsuki/freestanding-headers.git --depth=1
-[ -d libgcc-binaries ] || git clone https://github.com/mintsuki/libgcc-binaries.git --depth=1
+FREESTANDING_TOOLCHAIN_COMMIT_HASH=2ab7a489652291d430a7b693430c97ea9cb7bcbf
+FREESTANDING_TOOLCHAIN_HASH=558c0a1f4e10aeb32e1331e0139a571cde648fe281b85a2163e1f4b5fe639cec1ba87906d24dcfe52b62540290beac71a2ba3e3c20686933c969b60f122826a5
+
+FLANTERM_COMMIT_HASH=545ab1faa8ba7493ae7a43064d520e402ad308b5
+
+FREESTANDING_HEADERS_COMMIT_HASH=dd3abd2d7147efc4170dff478d3b7730bed14147
+
+CC_RUNTIME_COMMIT_HASH=38942e9a0d11af77c5d9fb45794850f7a1565d2b
+
+PRINTF_COMMIT_HASH=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
+
+MLIBC_COMMIT_HASH=f79fa8e71123d85d9c8fbbbb8a6aa298f05282bc
+
+clone_repo_commit() {
+    [ -d $2 ] && (
+        set -e
+        if [ -d $2/.git ]; then
+            git -C $2 checkout $3 || (
+                set -e
+                rm -rf $2
+            )
+        fi
+    )
+    [ -d $2 ] || (
+        set -e
+        git clone $1 $2
+        git -C $2 checkout $3
+    )
+}
+
+clone_repo_commit https://github.com/mintsuki/flanterm.git src/flanterm $FLANTERM_COMMIT_HASH
+clone_repo_commit https://github.com/mintsuki/freestanding-headers.git freestanding-headers $FREESTANDING_HEADERS_COMMIT_HASH
+clone_repo_commit https://github.com/mintsuki/cc-runtime.git src/cc-runtime $CC_RUNTIME_COMMIT_HASH
+clone_repo_commit https://github.com/eyalroz/printf.git printf $PRINTF_COMMIT_HASH
+mkdir -p src/printf
+cp -pv printf/src/printf/* src/printf
+clone_repo_commit https://github.com/mintsuki/mlibc.git mlibc $MLIBC_COMMIT_HASH
+mkdir -p mlibc-build
+cd mlibc-build
+meson setup \
+    --cross-file ../cross_file.txt \
+    --prefix=/ \
+    -Dheaders_only=true \
+    -Ddisable_crypt_option=true \
+    -Ddisable_iconv_option=true \
+    -Ddisable_intl_option=true \
+    ../mlibc
+ninja
+mkdir ../mlibc-headers-out
+DESTDIR="$(cd ../mlibc-headers-out && pwd -P)" ninja install
+cd ..
+mv mlibc-headers-out/include mlibc-headers
+rm -rf mlibc-build mlibc-headers-out
+
 [ -f src/limine.h ] || curl -Lo src/limine.h https://github.com/limine-bootloader/limine/raw/trunk/limine.h
-[ -d src/flanterm ] || git clone https://github.com/mintsuki/flanterm.git src/flanterm --depth=1
-if ! [ -d src/printf ]; then
-    mkdir src/printf
-    curl -Lo src/printf/printf.c https://github.com/eyalroz/printf/raw/master/src/printf/printf.c
-    curl -Lo src/printf/printf.h https://github.com/eyalroz/printf/raw/master/src/printf/printf.h
-fi
 
-MLIBC_VERSION=85862a42dcbfbb231558f4afbc5c816b727a8837
+########################################################
+########################################################
 
-if ! [ -d mlibc-headers ]; then
-    curl -Lo mlibc.tar.gz https://github.com/mintsuki/mlibc/archive/${MLIBC_VERSION}.tar.gz
-    tar -xf mlibc.tar.gz
-    mkdir mlibc-build
-    cd mlibc-build
-    meson setup \
-        --cross-file ../cross_file.txt \
-        --prefix=/ \
-        -Dheaders_only=true \
-        -Ddisable_crypt_option=true \
-        -Ddisable_iconv_option=true \
-        -Ddisable_intl_option=true \
-        ../mlibc-${MLIBC_VERSION}
-    ninja
-    mkdir ../mlibc-headers-out
-    DESTDIR="$(cd ../mlibc-headers-out && pwd -P)" ninja install
-    cd ..
-    mv mlibc-headers-out/include mlibc-headers
-    rm -rf mlibc.tar.gz mlibc-${MLIBC_VERSION} mlibc-build mlibc-headers-out
-fi
+[ -f freestanding-toolchain ] && (
+    set -e
+    b2sum freestanding-toolchain | grep $FREESTANDING_TOOLCHAIN_HASH >/dev/null 2>&1 || (
+        set -e
+        rm -f freestanding-toolchain
+    )
+)
+[ -f freestanding-toolchain ] || (
+    set -e
+    curl -Lo freestanding-toolchain https://github.com/mintsuki/freestanding-toolchain/raw/$FREESTANDING_TOOLCHAIN_COMMIT_HASH/freestanding-toolchain
+    chmod +x freestanding-toolchain
+)
 
-AUTOMAKE_LIBDIR="$(automake --print-libdir)"
-cp "${AUTOMAKE_LIBDIR}/INSTALL" ./
-mkdir -p build-aux
-cp "${AUTOMAKE_LIBDIR}/install-sh" build-aux/
+########################################################
+########################################################
 
 autoreconf -fvi -Wall
+
+# Older versions of autoreconf have a bug where they do not
+# install auxiliary files, sometimes... Check if that is the
+# case and work around...
+for auxfile in install-sh; do
+    if ! [ -f build-aux/$auxfile ]; then
+        mkdir -p build-aux
+        cp -v "$(automake --print-libdir)/$auxfile" build-aux/
+    fi
+done

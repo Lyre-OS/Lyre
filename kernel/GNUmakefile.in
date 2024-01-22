@@ -115,7 +115,6 @@ ifeq ($(ARCH),x86_64)
         -m elf_x86_64
 #    override NASMFLAGS += \
 #        -f elf64
-    override LIBGCC := x86_64-no-red-zone
 else
     $(error Architecture $(ARCH) not supported)
 endif
@@ -146,12 +145,12 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 all: $(OUTPUT)
 
 # Link rules for the final kernel executable.
-$(OUTPUT): GNUmakefile $(call MKESCAPE,$(SRCDIR))/linker-$(ARCH).ld $(OBJ) $(call MKESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a
+$(OUTPUT): GNUmakefile $(call MKESCAPE,$(SRCDIR))/linker-$(ARCH).ld $(OBJ)
 	$(MKDIR_P) "$$(dirname $@)"
-	$(LD) $(OBJ) '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' $(LDFLAGS) -o $@
+	$(LD) $(OBJ) $(LDFLAGS) -o $@
 	'$(call SHESCAPE,$(SRCDIR))/gensyms.sh' $@ > obj/symtab.map
 	$(CC) $(CFLAGS) $(CPPFLAGS) -x c -c obj/symtab.map -o obj/symtab.map.o
-	$(LD) $(OBJ) '$(call SHESCAPE,$(SRCDIR))/libgcc-binaries/libgcc-$(LIBGCC).a' obj/symtab.map.o $(LDFLAGS) -o $@
+	$(LD) $(OBJ) obj/symtab.map.o $(LDFLAGS) -o $@
 
 # Include header dependencies.
 -include $(HEADER_DEPS)
@@ -196,17 +195,10 @@ dist:
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/.github
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/autom4te.cache
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/freestanding-headers/.git
-	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/libgcc-binaries/.git
-	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/libgcc-binaries/.gitignore
+	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/src/cc-runtime/.git
 	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/src/flanterm/.git
-	libgcc_needed="x86_64-no-red-zone"; \
-	for f in $$libgcc_needed; do \
-		mv "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)/libgcc-binaries/libgcc-$$f.a" "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)/libgcc-binaries/libgcc-$$f.a.save"; \
-	done; \
-	rm "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)/libgcc-binaries"/*.a; \
-	for f in $$libgcc_needed; do \
-		mv "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)/libgcc-binaries/libgcc-$$f.a.save" "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)/libgcc-binaries/libgcc-$$f.a"; \
-	done
+	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/printf
+	rm -rf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/mlibc
 	echo "$(PACKAGE_VERSION)" >"$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"/version
 	tar -Jcf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)".tar.xz "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"
 	tar -zcf "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)".tar.gz "$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)"
@@ -215,7 +207,7 @@ dist:
 # Remove ALL generated files.
 .PHONY: maintainer-clean
 maintainer-clean: distclean
-	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf src/printf src/flanterm mlibc-headers freestanding-headers libgcc-binaries freestanding-toolchain src/limine.h configure INSTALL build-aux *'~' autom4te.cache
+	cd '$(call SHESCAPE,$(SRCDIR))' && rm -rf printf src/printf src/flanterm mlibc mlibc-headers freestanding-headers src/cc-runtime freestanding-toolchain src/limine.h configure build-aux *'~' autom4te.cache
 
 # Install files and executables to the final locations.
 .PHONY: install

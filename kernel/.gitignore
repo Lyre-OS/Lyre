@@ -6,7 +6,6 @@
 /build
 /GNUmakefile
 /autom4te.cache
-/INSTALL
 /build-aux
 /config.log
 /config.status
@@ -17,7 +16,9 @@
 /freestanding-toolchain
 /toolchain-files
 /freestanding-headers
-/libgcc-binaries
 /src/printf
 /src/flanterm
+/src/cc-runtime
+/mlibc
 /mlibc-headers
+/printf
