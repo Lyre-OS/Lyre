@@ -29,5 +29,7 @@ build() {
 package() {
     DESTDIR="${dest_dir}" ninja install
 
+    rm -rf "${dest_dir}${prefix}"/lib/*.a
+
     post_package_strip
 }
