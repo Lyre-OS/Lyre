@@ -44,7 +44,7 @@ index f815a09..d403653 100644
      "BSD-generic32" => {
          # As for thread cflag. Idea is to maintain "collective" set of
 diff --git openssl-clean/Configure openssl-workdir/Configure
-index 4bea49d..964793f 100755
+index 78cc15d..2d3fb3e 100755
 --- openssl-clean/Configure
 +++ openssl-workdir/Configure
 @@ -1549,20 +1549,7 @@ unless ($disabled{"crypto-mdebug-backtrace"})
@@ -82,6 +82,21 @@ index 89bf184..7432224 100644
  #define MAX_MISALIGNMENT 63
  #define MAX_ECDH_SIZE   256
  #define MISALIGN        64
+diff --git openssl-clean/crypto/mem_sec.c openssl-workdir/crypto/mem_sec.c
+index 222c786..edb5192 100644
+--- openssl-clean/crypto/mem_sec.c
++++ openssl-workdir/crypto/mem_sec.c
+@@ -492,8 +492,10 @@ static int sh_init(size_t size, int minsize)
+         ret = 2;
+ #endif
+ #ifdef MADV_DONTDUMP
++/*
+     if (madvise(sh.arena, sh.arena_size, MADV_DONTDUMP) < 0)
+         ret = 2;
++*/
+ #endif
+ 
+     return ret;
 diff --git openssl-clean/test/rsa_complex.c openssl-workdir/test/rsa_complex.c
 index fac5812..a23670d 100644
 --- openssl-clean/test/rsa_complex.c
