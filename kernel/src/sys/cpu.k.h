@@ -54,14 +54,6 @@ struct tss {
     uint32_t iopb;
 } __attribute__((packed));
 
-#ifndef HAVE_SPINLOCK_T
-typedef struct {
-    int lock;
-    void *last_acquirer;
-} spinlock_t;
-#define HAVE_SPINLOCK_T
-#endif
-
 struct cpu_local {
     int cpu_number;
     bool bsp;
@@ -71,9 +63,6 @@ struct cpu_local {
     uint64_t lapic_freq;
     struct tss tss;
     struct thread *idle_thread;
-    spinlock_t tlb_shootdown_lock;
-    spinlock_t tlb_shootdown_done;
-    volatile uintptr_t tlb_shootdown_cr3;
 };
 
 extern struct cpu_local *cpus;

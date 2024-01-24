@@ -39,7 +39,6 @@ struct thread {
     int tid;
     spinlock_t lock;
     struct cpu_local *this_cpu;
-    bool scheduling_off;
     int running_on;
     bool enqueued;
     bool enqueued_by_signal;

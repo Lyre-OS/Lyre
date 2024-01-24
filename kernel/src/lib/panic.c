@@ -22,7 +22,7 @@ noreturn void panic(struct cpu_ctx *ctx, bool trace, const char *fmt, ...) {
 
         spinlock_acquire_no_dead_check(&panic_lock);
 
-        lapic_send_ipi(0, idt_panic_ipi_vector | 0b11 << 18);
+        lapic_send_ipi(0, idt_panic_ipi_vector | 0b10 << 18);
 
         while (panic_cpu_counter != cpu_count) {}
     }

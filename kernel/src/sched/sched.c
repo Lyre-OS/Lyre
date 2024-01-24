@@ -112,17 +112,11 @@ static void sched_entry(int vector, struct cpu_ctx *ctx) {
 
     lapic_timer_stop();
 
-    struct thread *current_thread = sched_current_thread();
-
-    if (current_thread && current_thread->scheduling_off) {
-        lapic_eoi();
-        lapic_timer_oneshot(current_thread->timeslice, sched_vector);
-        return;
-    }
-
     struct cpu_local *cpu = this_cpu();
 
     cpu->active = true;
+
+    struct thread *current_thread = sched_current_thread();
 
     struct thread *next_thread = get_next_thread();
 

@@ -4,13 +4,10 @@
 #include <stdbool.h>
 #include <lib/misc.k.h>
 
-#ifndef HAVE_SPINLOCK_T
 typedef struct {
     int lock;
     void *last_acquirer;
 } spinlock_t;
-#define HAVE_SPINLOCK_T
-#endif
 
 #define SPINLOCK_INIT {0, NULL}
 
@@ -23,7 +20,7 @@ void spinlock_acquire_no_dead_check(spinlock_t *lock);
 
 static inline void spinlock_release(spinlock_t *lock) {
     lock->last_acquirer = NULL;
-    __atomic_store_n(&lock->lock, 0, __ATOMIC_SEQ_CST);
+    CAS(&lock->lock, 1, 0);
 }
 
 #endif

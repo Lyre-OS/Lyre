@@ -259,11 +259,9 @@ void cpu_init(void) {
 }
 
 struct cpu_local *this_cpu(void) {
-    struct thread *thread = sched_current_thread();
-
-    if (!thread->scheduling_off && interrupt_state()) {
-        panic(NULL, true, "Calling this_cpu() with interrupts on or scheduling enabled is a bug");
+    if (interrupt_state()) {
+        panic(NULL, true, "Calling this_cpu() with interrupts on is a bug");
     }
 
-    return thread->this_cpu;
+    return sched_current_thread()->this_cpu;
 }

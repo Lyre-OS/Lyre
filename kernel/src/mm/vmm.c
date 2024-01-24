@@ -12,8 +12,6 @@
 #include <mm/pmm.k.h>
 #include <mm/mmap.k.h>
 #include <mm/vmm.k.h>
-#include <sys/idt.k.h>
-#include <dev/lapic.k.h>
 
 volatile struct limine_hhdm_request hhdm_request = {
     .id = LIMINE_HHDM_REQUEST,
@@ -50,9 +48,6 @@ static uint64_t *get_next_level(uint64_t *top_level, size_t idx, bool allocate) 
     top_level[idx] = (uint64_t)next_level | PTE_PRESENT | PTE_WRITABLE | PTE_USER;
     return next_level + VMM_HIGHER_HALF;
 }
-
-static uint8_t tlb_shootdown_ipi_vector;
-static void tlb_shootdown_handler(int vector, struct cpu_ctx *ctx);
 
 void vmm_init(void) {
     ASSERT(kaddr_request.response != NULL);
@@ -116,9 +111,6 @@ void vmm_init(void) {
             ASSERT(vmm_map_page(vmm_kernel_pagemap, j + VMM_HIGHER_HALF, j, PTE_PRESENT | PTE_WRITABLE | PTE_NX));
         }
     }
-
-    tlb_shootdown_ipi_vector = idt_allocate_vector();
-    isr[tlb_shootdown_ipi_vector] = tlb_shootdown_handler;
 
     vmm_switch_to(vmm_kernel_pagemap);
     vmm_initialised = true;
@@ -256,72 +248,6 @@ cleanup:
     return NULL;
 }
 
-static void tlb_shootdown_handler(int vector, struct cpu_ctx *ctx) {
-    (void)vector;
-    (void)ctx;
-
-    struct cpu_local *cpu = this_cpu();
-
-    if (read_cr3() == cpu->tlb_shootdown_cr3) {
-        write_cr3(read_cr3());
-    }
-
-    spinlock_release(&cpu->tlb_shootdown_done);
-
-    lapic_eoi();
-}
-
-static void tlb_shootdown(struct pagemap *pagemap) {
-    if (!smp_started) {
-        return;
-    }
-
-    struct thread *thread = sched_current_thread();
-
-    bool old_sched_state = thread->scheduling_off;
-    thread->scheduling_off = true;
-
-    bool old_int = interrupt_toggle(true);
-
-    struct cpu_local *us = this_cpu();
-
-    for (size_t i = 0; i < cpu_count; i++) {
-        struct cpu_local *cpu = &cpus[i];
-
-        if (cpu == us) {
-            if (read_cr3() == (uintptr_t)pagemap->top_level - VMM_HIGHER_HALF) {
-                write_cr3(read_cr3());
-            }
-            continue;
-        }
-
-        spinlock_acquire(&cpu->tlb_shootdown_lock);
-        spinlock_acquire(&cpu->tlb_shootdown_done);
-
-        cpu->tlb_shootdown_cr3 = (uintptr_t)pagemap->top_level - VMM_HIGHER_HALF;
-        asm volatile ("" ::: "memory");
-        lapic_send_ipi(cpu->lapic_id, tlb_shootdown_ipi_vector | (1 << 14));
-
-        volatile int timeout = 0;
-        while (!spinlock_test_and_acq(&cpu->tlb_shootdown_done)) {
-            if (++timeout % 100) {
-                asm ("pause");
-                continue;
-            }
-            if (timeout % 1000 == 0) {
-                break;
-            }
-            lapic_send_ipi(cpu->lapic_id, tlb_shootdown_ipi_vector | (1 << 14));
-        }
-        spinlock_release(&cpu->tlb_shootdown_done);
-        spinlock_release(&cpu->tlb_shootdown_lock);
-    }
-
-    interrupt_toggle(old_int);
-
-    thread->scheduling_off = old_sched_state;
-}
-
 static void destroy_level(uint64_t *pml, size_t start, size_t end, int level) {
     if (level == 0) {
         return;
@@ -395,8 +321,6 @@ bool vmm_map_page(struct pagemap *pagemap, uintptr_t virt, uintptr_t phys, uint6
     pml1[pml1_entry] = phys | flags;
 
 cleanup:
-    tlb_shootdown(pagemap);
-
     spinlock_release(&pagemap->lock);
     return ok;
 }
@@ -434,9 +358,14 @@ bool vmm_flag_page(struct pagemap *pagemap, bool lock, uintptr_t virt, uint64_t 
     ok = true;
     pml1[pml1_entry] = PTE_GET_ADDR(pml1[pml1_entry]) | flags;
 
-cleanup:
-    tlb_shootdown(pagemap);
+    asm volatile (
+        "invlpg (%0)"
+        :
+        : "r" (virt)
+        : "memory"
+    );
 
+cleanup:
     if (lock) {
         spinlock_release(&pagemap->lock);
     }
@@ -476,9 +405,14 @@ bool vmm_unmap_page(struct pagemap *pagemap, uintptr_t virt, bool already_locked
     ok = true;
     pml1[pml1_entry] = 0;
 
-cleanup:
-    tlb_shootdown(pagemap);
+    asm volatile (
+        "invlpg (%0)"
+        :
+        : "r" (virt)
+        : "memory"
+    );
 
+cleanup:
     if (!already_locked) {
         spinlock_release(&pagemap->lock);
     }
