@@ -1,8 +1,8 @@
 name=dbus
-version=1.15.4
+version=1.15.8
 revision=1
 tarball_url="https://dbus.freedesktop.org/releases/dbus/dbus-${version}.tar.xz"
-tarball_blake2b="6007be414497ef95f1e6a7e937c6a0a9b590c163b6b3a1c3e61b6726b988192728aa85a328d89472f34613d48ca1bb6844e86bee997acb4f377a228b2072fbce"
+tarball_blake2b="7c1962dfccc6a1b6250e80b0706d7f44536fabeff009013865ec4b1edaec6d4b47dcbe8f78caa61ef7aef4bac6b79f0e2027dd16bbb2baae328429e648bf8b8c"
 source_hostdeps="automake autoconf libtool pkg-config"
 source_deps="autoconf-archive"
 hostdeps="gcc autoconf automake libtool pkg-config"
