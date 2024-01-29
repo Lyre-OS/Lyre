@@ -1,8 +1,8 @@
 name=gsettings-desktop-schemas
-version=44.0
+version=45.0
 revision=1
-tarball_url="https://download.gnome.org/sources/gsettings-desktop-schemas/44/gsettings-desktop-schemas-${version}.tar.xz"
-tarball_blake2b="01a5ca9fb73dc9768f5bb42192f282cc06348f0532b19648aa6b4c33f87e0a9febf0d50047de6cb4c9e921df2df6b45cdde9514d4c0be322b04553f525f84311"
+tarball_url="https://download.gnome.org/sources/gsettings-desktop-schemas/45/gsettings-desktop-schemas-${version}.tar.xz"
+tarball_blake2b="b65c846654fac5a104ad9a7d67546c6fb3d54aada178d58c575d22a8c2adc0057c1f1dc177562740f7ae94d0e17743789ca902db7c2fcc42c844bb66e401eaec"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config"
 deps="core-libs glib"
