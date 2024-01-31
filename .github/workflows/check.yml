@@ -11,11 +11,14 @@ on:
 jobs:
   lyre-build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+    container: archlinux:latest
 
+    steps:
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install build-essential meson nasm rsync clang llvm lld -y
+        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake nasm curl llvm clang lld
+
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build the Lyre kernel
         run: |
