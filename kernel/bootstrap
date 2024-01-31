@@ -41,7 +41,7 @@ clone_repo_commit https://github.com/eyalroz/printf.git printf $PRINTF_COMMIT_HA
 mkdir -p src/printf
 cp -pv printf/src/printf/* src/printf
 
-clone_repo_commit https://github.com/managarm/mlibc.git mlibc $MLIBC_COMMIT_HASH
+clone_repo_commit https://github.com/mintsuki/mlibc.git mlibc $MLIBC_COMMIT_HASH
 mkdir -p mlibc-build
 cd mlibc-build
 meson setup \
