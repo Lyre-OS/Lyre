@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake nasm curl llvm clang lld
+        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake meson ninja nasm curl llvm clang lld
 
       - name: Checkout code
         uses: actions/checkout@v4
