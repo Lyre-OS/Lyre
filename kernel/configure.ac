@@ -69,7 +69,7 @@ ARCHITECTURE="$ARCH" \
     FREESTANDING_STRIP="$STRIP" \
     WANT_FREESTANDING_OBJDUMP=yes \
     FREESTANDING_OBJDUMP="$OBJDUMP" \
-    "$SRCDIR/freestanding-toolchain" 2>"toolchain-files/$ARCH-toolchain.mk" || exit 1
+    "$SRCDIR/build-aux/freestanding-toolchain/freestanding-toolchain" 2>"toolchain-files/$ARCH-toolchain.mk" || exit 1
 
 AC_SUBST([TOOLCHAIN_FILE], [toolchain-files/$ARCH-toolchain.mk])
 

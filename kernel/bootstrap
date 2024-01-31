@@ -7,18 +7,12 @@ test -z "$srcdir" && srcdir=.
 
 cd "$srcdir"
 
-FREESTANDING_TOOLCHAIN_COMMIT_HASH=2ab7a489652291d430a7b693430c97ea9cb7bcbf
-FREESTANDING_TOOLCHAIN_HASH=558c0a1f4e10aeb32e1331e0139a571cde648fe281b85a2163e1f4b5fe639cec1ba87906d24dcfe52b62540290beac71a2ba3e3c20686933c969b60f122826a5
-
-FLANTERM_COMMIT_HASH=545ab1faa8ba7493ae7a43064d520e402ad308b5
-
+FREESTANDING_TOOLCHAIN_COMMIT_HASH=18a5e52483344e117d45738c9afb2b34792cbced
 FREESTANDING_HEADERS_COMMIT_HASH=dd3abd2d7147efc4170dff478d3b7730bed14147
-
 CC_RUNTIME_COMMIT_HASH=38942e9a0d11af77c5d9fb45794850f7a1565d2b
-
+FLANTERM_COMMIT_HASH=545ab1faa8ba7493ae7a43064d520e402ad308b5
 PRINTF_COMMIT_HASH=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
-
-MLIBC_COMMIT_HASH=b719dde49e24a1be8cbbc16b3cdddf6dddfa90f7
+MLIBC_COMMIT_HASH=ef991178674790522f524ddd26556ce7f44f564e
 
 clone_repo_commit() {
     [ -d $2 ] && (
@@ -37,13 +31,17 @@ clone_repo_commit() {
     )
 }
 
-clone_repo_commit https://github.com/mintsuki/flanterm.git src/flanterm $FLANTERM_COMMIT_HASH
+clone_repo_commit https://github.com/mintsuki/freestanding-toolchain.git build-aux/freestanding-toolchain $FREESTANDING_TOOLCHAIN_COMMIT_HASH
 clone_repo_commit https://github.com/mintsuki/freestanding-headers.git freestanding-headers $FREESTANDING_HEADERS_COMMIT_HASH
 clone_repo_commit https://github.com/mintsuki/cc-runtime.git src/cc-runtime $CC_RUNTIME_COMMIT_HASH
+
+clone_repo_commit https://github.com/mintsuki/flanterm.git src/flanterm $FLANTERM_COMMIT_HASH
+
 clone_repo_commit https://github.com/eyalroz/printf.git printf $PRINTF_COMMIT_HASH
 mkdir -p src/printf
 cp -pv printf/src/printf/* src/printf
-clone_repo_commit https://github.com/mintsuki/mlibc.git mlibc $MLIBC_COMMIT_HASH
+
+clone_repo_commit https://github.com/managarm/mlibc.git mlibc $MLIBC_COMMIT_HASH
 mkdir -p mlibc-build
 cd mlibc-build
 meson setup \
@@ -58,29 +56,11 @@ ninja
 mkdir ../mlibc-headers-out
 DESTDIR="$(cd ../mlibc-headers-out && pwd -P)" ninja install
 cd ..
+rm -rf mlibc-headers
 mv mlibc-headers-out/include mlibc-headers
 rm -rf mlibc-build mlibc-headers-out
 
 [ -f src/limine.h ] || curl -Lo src/limine.h https://github.com/limine-bootloader/limine/raw/trunk/limine.h
-
-########################################################
-########################################################
-
-[ -f freestanding-toolchain ] && (
-    set -e
-    b2sum freestanding-toolchain | grep $FREESTANDING_TOOLCHAIN_HASH >/dev/null 2>&1 || (
-        set -e
-        rm -f freestanding-toolchain
-    )
-)
-[ -f freestanding-toolchain ] || (
-    set -e
-    curl -Lo freestanding-toolchain https://github.com/mintsuki/freestanding-toolchain/raw/$FREESTANDING_TOOLCHAIN_COMMIT_HASH/freestanding-toolchain
-    chmod +x freestanding-toolchain
-)
-
-########################################################
-########################################################
 
 autoreconf -fvi -Wall
 

@@ -13,7 +13,6 @@
 /*~
 /src/limine.h
 /compile_commands.json
-/freestanding-toolchain
 /toolchain-files
 /freestanding-headers
 /src/printf
