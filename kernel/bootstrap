@@ -15,20 +15,17 @@ PRINTF_COMMIT_HASH=af05afe8ef0f84cb9f3a9bbfd79ac81a941cbebf
 MLIBC_COMMIT_HASH=548e6f707062eb778395adf5c49b7f76f9dbe1b8
 
 clone_repo_commit() {
-    [ -d $2 ] && (
-        set -e
-        if [ -d $2/.git ]; then
-            git -C $2 checkout $3 || (
-                set -e
-                rm -rf $2
-            )
+    if [ -d $2/.git ]; then
+        git -C $2 reset --hard
+        git -C $2 clean -fd
+        if ! git -C $2 checkout $3; then
+            rm -rf $2
         fi
-    )
-    [ -d $2 ] || (
-        set -e
+    fi
+    if ! [ -d $2 ]; then
         git clone $1 $2
         git -C $2 checkout $3
-    )
+    fi
 }
 
 clone_repo_commit https://github.com/mintsuki/freestanding-toolchain.git build-aux/freestanding-toolchain $FREESTANDING_TOOLCHAIN_COMMIT_HASH
