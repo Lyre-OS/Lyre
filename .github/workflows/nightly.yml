@@ -2,7 +2,7 @@ name: Nightly Lyre rebuild
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 30 * *'
 
 jobs:
   lyre-build:

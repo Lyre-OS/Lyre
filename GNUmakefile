@@ -22,11 +22,11 @@ jinx:
 	chmod +x jinx
 
 .PHONY: distro-full
-distro-full: jinx
+distro-full: jinx kernel
 	./jinx build-all
 
 .PHONY: distro-base
-distro-base: jinx
+distro-base: jinx kernel
 	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata xz zlib zstd
 
 .PHONY: run-kvm
@@ -67,8 +67,7 @@ clean: kernel-clean init-clean base-files-clean
 
 .PHONY: distclean
 distclean: jinx
-	cd kernel && ./bootstrap && ./configure && make maintainer-clean
 	./jinx clean
-	rm -rf iso_root sysroot lyre.iso initramfs.tar jinx ovmf
+	rm -rf kernel iso_root sysroot lyre.iso initramfs.tar jinx ovmf
 	chmod -R 777 .jinx-cache
 	rm -rf .jinx-cache
