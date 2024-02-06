@@ -5,10 +5,13 @@ all:
 	rm -f lyre.iso
 	$(MAKE) lyre.iso
 
-lyre.iso: jinx
+lyre.iso: jinx kernel
 	rm -f builds/kernel.built builds/kernel.packaged
 	$(MAKE) distro-base
 	./build-support/makeiso.sh
+
+kernel:
+	git clone https://github.com/Lyre-OS/klyre.git kernel
 
 .PHONY: debug
 debug:
