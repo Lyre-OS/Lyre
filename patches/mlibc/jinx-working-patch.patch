@@ -11,18 +11,6 @@ index 7a75d3a..15269b0 100644
  };
  
  #endif /* _ABIBITS_STATVFS_H */
-diff --git mlibc-clean/options/ansi/generic/time-stubs.cpp mlibc-workdir/options/ansi/generic/time-stubs.cpp
-index 887a7d3..7fd46bc 100644
---- mlibc-clean/options/ansi/generic/time-stubs.cpp
-+++ mlibc-workdir/options/ansi/generic/time-stubs.cpp
-@@ -242,6 +242,7 @@ size_t strftime(char *__restrict dest, size_t max_size,
- 			c++;
- 			break;
- 		}
-+		case 'l':
- 		case 'I': {
- 			int hour = tm->tm_hour;
- 			if(!hour)
 diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
 index 3474615..e034881 100644
 --- mlibc-clean/options/glibc/generic/execinfo.cpp
