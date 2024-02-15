@@ -21,8 +21,9 @@ int main(void) {
 
         int pid = fork();
 
-        if (pid == -1) {
-            perror("init: fork failed");
+        if (pid == -1) 
+        {
+            panic("init: fork failed");
             return EXIT_FAILURE;
         }
 
