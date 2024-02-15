@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include "unistd.h"
 int panic(const char *fmt) // Kernel panic
 {
   printf("Kernel panic: %s\n", fmt);
