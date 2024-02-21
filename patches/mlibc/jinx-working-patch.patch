@@ -1,16 +1,3 @@
-diff --git mlibc-clean/abis/linux/statvfs.h mlibc-workdir/abis/linux/statvfs.h
-index 7a75d3a..15269b0 100644
---- mlibc-clean/abis/linux/statvfs.h
-+++ mlibc-workdir/abis/linux/statvfs.h
-@@ -23,6 +23,8 @@ struct statvfs {
- 	unsigned long f_fsid;
- 	unsigned long f_flag;
- 	unsigned long f_namemax;
-+
-+	char f_basetype[80];
- };
- 
- #endif /* _ABIBITS_STATVFS_H */
 diff --git mlibc-clean/options/glibc/generic/execinfo.cpp mlibc-workdir/options/glibc/generic/execinfo.cpp
 index 3474615..e034881 100644
 --- mlibc-clean/options/glibc/generic/execinfo.cpp
