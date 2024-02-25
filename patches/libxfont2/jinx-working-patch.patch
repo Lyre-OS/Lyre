@@ -1,5 +1,5 @@
 diff --git libxfont2-clean/src/fc/fslibos.h libxfont2-workdir/src/fc/fslibos.h
-index 1ef362d..3475a02 100644
+index 1ef362d..c75e63a 100644
 --- libxfont2-clean/src/fc/fslibos.h
 +++ libxfont2-workdir/src/fc/fslibos.h
 @@ -60,7 +60,7 @@ from The Open Group.
