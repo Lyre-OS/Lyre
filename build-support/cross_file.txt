@@ -1,10 +1,10 @@
 [binaries]
-c = 'x86_64-lyre-gcc'
-cpp = 'x86_64-lyre-g++'
-ar = 'x86_64-lyre-ar'
-nm = 'x86_64-lyre-nm'
-strip = 'x86_64-lyre-strip'
-pkg-config = 'x86_64-lyre-pkg-config'
+c = 'x86_64-pc-lyre-mlibc-gcc'
+cpp = 'x86_64-pc-lyre-mlibc-g++'
+ar = 'x86_64-pc-lyre-mlibc-ar'
+nm = 'x86_64-pc-lyre-mlibc-nm'
+strip = 'x86_64-pc-lyre-mlibc-strip'
+pkg-config = 'x86_64-pc-lyre-mlibc-pkg-config'
 llvm-config = '/base_dir/build-support/cross-llvm-config'
 
 [host_machine]
