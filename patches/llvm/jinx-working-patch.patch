@@ -93,7 +93,7 @@ index 40038dc..198c4d5 100644
        "x86_64-manbo-linux-gnu", "x86_64-linux-gnu",
        "x86_64-slackware-linux", "x86_64-unknown-linux",
 -      "x86_64-amazon-linux"};
-+      "x86_64-amazon-linux", "x86_64-lyre"};
++      "x86_64-amazon-linux", "x86_64-pc-lyre-mlibc"};
    static const char *const X32Triples[] = {"x86_64-linux-gnux32",
                                             "x86_64-pc-linux-gnux32"};
    static const char *const X32LibDirs[] = {"/libx32", "/lib"};
@@ -147,11 +147,11 @@ index 0000000..d180195
 +
 +  case llvm::Triple::x86_64:
 +    // We don't want this for x32, otherwise it will match x86_64 libs
-+    return "x86_64-lyre";
++    return "x86_64-pc-lyre-mlibc";
 +  case llvm::Triple::aarch64:
-+    return "aarch64-lyre";
++    return "aarch64-lyre-mlibc";
 +  case llvm::Triple::riscv64:
-+    return "riscv64-lyre";
++    return "riscv64-lyre-mlibc";
 +  }
 +  return TargetTriple.str();
 +}
@@ -349,10 +349,10 @@ index 0000000..d180195
 +std::string Lyre::getDynamicLinker(const ArgList &Args) const {
 +  switch (getTriple().getArch()) {
 +  case llvm::Triple::aarch64:
-+    return "/usr/lib/aarch64-lyre/ld.so";
++    return "/usr/lib/aarch64-lyre-mlibc/ld.so";
 +  case llvm::Triple::riscv64: {
 +    StringRef ABIName = tools::riscv::getRISCVABI(Args, getTriple());
-+    return ("/usr/lib/riscv64-lyre/ld-riscv64-" + ABIName + ".so").str();
++    return ("/usr/lib/riscv64-lyre-mlibc/ld-riscv64-" + ABIName + ".so").str();
 +  }
 +  case llvm::Triple::x86_64:
 +    return "/usr/lib/ld.so";
@@ -410,11 +410,11 @@ index 0000000..d180195
 +
 +  // Implement generic Debian multiarch support.
 +  const StringRef AArch64MultiarchIncludeDirs[] = {
-+      "/usr/include/aarch64-lyre-gnu"};
++      "/usr/include/aarch64-lyre-mlibc"};
 +  const StringRef X86_64MultiarchIncludeDirs[] = {
-+      "/usr/include/x86_64-lyre-gnu"};
++      "/usr/include/x86_64-pc-lyre-mlibc"};
 +  const StringRef X86MultiarchIncludeDirs[] = {
-+      "/usr/include/i386-lyre-gnu"};
++      "/usr/include/i386-pc-lyre-mlibc"};
 +  ArrayRef<StringRef> MultiarchIncludeDirs;
 +  switch (getTriple().getArch()) {
 +  case llvm::Triple::aarch64:
