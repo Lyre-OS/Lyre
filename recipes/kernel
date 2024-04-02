@@ -16,6 +16,7 @@ build() {
     autotools_configure \
         TOOLCHAIN=${OS_TRIPLET}
 
+        LDFLAGS="" \
     make -j${parallelism}
 }
 

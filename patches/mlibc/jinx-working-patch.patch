@@ -15,3 +15,16 @@ index 3474615..e034881 100644
  }
  
  char **backtrace_symbols(void *const *, int) {
+diff --git mlibc-clean/sysdeps/lyre/x86_64/crt-src/crt0.S mlibc-workdir/sysdeps/lyre/x86_64/crt-src/crt0.S
+index d16a46f..bd9de71 100644
+--- mlibc-clean/sysdeps/lyre/x86_64/crt-src/crt0.S
++++ mlibc-workdir/sysdeps/lyre/x86_64/crt-src/crt0.S
+@@ -1,7 +1,7 @@
+ .section .text
+ .global _start
+ _start:
+-    mov $main, %rdi
++    lea main(%rip), %rdi
+     call __mlibc_entry
+ .section .note.GNU-stack,"",%progbits
+ 
