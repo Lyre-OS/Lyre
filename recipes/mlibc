@@ -1,8 +1,8 @@
 name=mlibc
-version=d64ebf923f46bf2f10cd81d1d1963c8998f54457
+version=0c28bd8862fb1b9131633a16504a5a3750091950
 revision=1
 tarball_url="https://github.com/mintsuki/mlibc/archive/${version}.tar.gz"
-tarball_blake2b="ade6049c20960a4e7645206924f11c13498afbc99c83cf00a92193df672834b6b84c51a60b0b4b30fae9dcc9310ed2816e0378de75910a4f74949bfc3d8ebddc"
+tarball_blake2b="94014a42d94235e592f70ff3e453d2306aa0e03c1e82dca8fc40809ff1f17e94c46385bd8d41a925a15a3e62448b18accd66ca260b42430c285529e95a616991"
 imagedeps="meson ninja"
 hostdeps="gcc pkg-config libgcc-binaries"
 builddeps="cshim cxxshim frigg"
