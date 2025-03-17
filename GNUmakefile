@@ -5,7 +5,7 @@ all:
 	rm -f lyre.iso
 	$(MAKE) lyre.iso
 
-lyre.iso: jinx
+lyre.iso: kernel jinx
 	./build-support/makeiso.sh
 
 kernel:
