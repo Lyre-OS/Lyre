@@ -17,7 +17,7 @@ fi
 # Prepare the iso and boot directories.
 rm -rf iso_root
 mkdir -pv iso_root/boot
-cp sysroot/usr/share/lyre/lyre iso_root/boot/
+cp sysroot/usr/share/klyre/klyre iso_root/boot/
 cp initramfs.tar iso_root/boot/
 cp build-support/limine.conf iso_root/boot/
 
