@@ -1,27 +1,36 @@
+#! /bin/sh
+
 name=limine
-version=7.4.0
+version=9.2.0
 revision=1
 tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
-tarball_blake2b="57d00bdfab43f17ad89c6f882993c379700364f99031490b156434dce04bb7c4c92218332aa82025f5e722e1241de8a770b1f602ca8b0f5bbbefdaac86749a94"
+tarball_blake2b="1748413935ef4f5ecad0f7e68aad832a616b4d23e0e6b4d8f65de6bf363aa00b28d63b6c7042bb0b967904b95d6af39ed22039756a3fa549f3f176f87674d7b0"
 source_hostdeps="autoconf automake libtool pkg-config"
 imagedeps="mtools nasm"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
-    autotools_configure \
-        --enable-uefi-ia32 \
-        --enable-uefi-x86-64 \
-        --enable-uefi-cd \
-        --enable-bios \
-        --enable-bios-cd \
-        --enable-bios-pxe \
-        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
+configure() {
+    if [ "$ARCHITECTURE" = "x86_64" ]; then
+        X86_FLAGS="--enable-bios \
+                   --enable-bios-cd \
+                   --enable-bios-pxe \
+                   --enable-uefi-ia32 \
+        "
+    fi
 
+    autotools_configure \
+        $X86_FLAGS \
+        --enable-uefi-$ARCHITECTURE \
+        --enable-uefi-cd \
+        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
+}
+
+build() {
     make -j${parallelism}
 }
 

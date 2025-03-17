@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=jwm
 version=2.4.3
 revision=1
@@ -8,16 +10,16 @@ source_deps="gettext"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs libx11 libxft libxmu libjpeg-turbo libxpm libxinerama libpng"
 
-regenerate() {
+prepare() {
         AUTOMAKE=true \
     autotools_recursive_regen
 }
 
-build() {
-    cp -rp "${source_dir}"/. ./
-
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

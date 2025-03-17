@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=zlib
 version=1.3.1
 revision=1
@@ -7,11 +9,17 @@ imagedeps="patchelf"
 hostdeps="gcc pkg-config"
 deps="core-libs"
 
-build() {
+configure() {
         prefix="${prefix}" \
         CHOST="${OS_TRIPLET}" \
+        CFLAGS="${TARGET_CFLAGS}" \
+        CXXFLAGS="${TARGET_CXXFLAGS}" \
+        CPPFLAGS="${TARGET_CPPFLAGS}" \
+        LDFLAGS="${TARGET_LDFLAGS}" \
     ${source_dir}/configure
+}
 
+build() {
     make -j${parallelism}
 }
 

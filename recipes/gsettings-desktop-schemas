@@ -1,20 +1,24 @@
+#! /bin/sh
+
 name=gsettings-desktop-schemas
-version=45.0
+version=47.1
 revision=1
-tarball_url="https://download.gnome.org/sources/gsettings-desktop-schemas/45/gsettings-desktop-schemas-${version}.tar.xz"
-tarball_blake2b="b65c846654fac5a104ad9a7d67546c6fb3d54aada178d58c575d22a8c2adc0057c1f1dc177562740f7ae94d0e17743789ca902db7c2fcc42c844bb66e401eaec"
-imagedeps="meson ninja"
+tarball_url="https://download.gnome.org/sources/gsettings-desktop-schemas/47/gsettings-desktop-schemas-${version}.tar.xz"
+tarball_blake2b="8a67f6da435c30b87c172ae12b1cce7d614f2804eb3135d6c36d144adce697aec13f9861ff15edf6a55c20f96cf51b0a9bbdcbdd6de65c327bc8cd13888fe389"
+imagedeps="meson ninja-build libglib2.0-dev"
 hostdeps="gcc pkg-config"
 deps="core-libs glib"
 
-regenerate() {
+prepare() {
     sed -i -r 's:"(/system):"/org/gnome\1:g' schemas/*.in
 }
 
-build() {
+configure() {
     meson_configure \
         -Dintrospection=false
+}
 
+build() {
     ninja -j${parallelism}
 }
 

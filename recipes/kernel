@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=kernel
 version=0.0
 revision=1
@@ -8,14 +10,16 @@ source_allow_network="yes"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
-regenerate() {
+prepare() {
     ./bootstrap
 }
 
-build() {
+configure() {
     autotools_configure \
         TOOLCHAIN=${OS_TRIPLET}
+}
 
+build() {
         LDFLAGS="" \
     make -j${parallelism}
 }

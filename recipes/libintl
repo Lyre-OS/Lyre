@@ -1,10 +1,12 @@
+#! /bin/sh
+
 name=libintl
 from_source=gettext
 revision=1
 hostdeps="gcc automake autoconf libtool pkg-config"
 deps="mlibc libgcc libstdc++ libiconv"
 
-build() {
+configure() {
         ACLOCAL=true \
         AUTOCONF=true \
         AUTOMAKE=true \
@@ -28,7 +30,9 @@ build() {
         --without-xz
 
     sed -i 's/touch $@//g' gettext-runtime/intl/Makefile
+}
 
+build() {
     make -C gettext-runtime/intl -j${parallelism}
 }
 

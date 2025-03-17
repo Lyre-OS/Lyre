@@ -1,50 +1,40 @@
+#! /bin/sh
+
 name=readline
-version=8.2.10
+version=8.2.13
 revision=1
 tarball_url="https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz"
 tarball_blake2b="7974322b9c092a756a79e537df08e8532f8e0fcb598f77732e28287c33ebec9e9837ed88b43334c310892d56a871b423903f0f564def2fbe700a1004f2ae7b18"
 source_allow_network="yes"
 source_imagedeps="curl"
 source_hostdeps="automake autoconf libtool pkg-config"
-imagedeps="patchelf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs ncurses"
 
-regenerate() {
-    curl -Lo readline82-001 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-001
-    curl -Lo readline82-002 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-002
-    curl -Lo readline82-003 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-003
-    curl -Lo readline82-004 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-004
-    curl -Lo readline82-005 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-005
-    curl -Lo readline82-006 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-006
-    curl -Lo readline82-007 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-007
-    curl -Lo readline82-008 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-008
-    curl -Lo readline82-009 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-009
-    curl -Lo readline82-010 https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-010
-
-    for f in readline82-0*; do
-        patch -p0 < $f
+prepare() {
+    for p in $(seq -w 13); do
+        curl -L https://ftp.gnu.org/gnu/readline/readline-8.2-patches/readline82-0$p | patch -p0
     done
 
-        AUTOHEADER=true \
-    autotools_recursive_regen
+    cp -v /usr/local/share/autoconf/build-aux/{config.guess,config.sub} ./support/
+    cp -v /usr/local/share/autoconf/build-aux/install-sh ./support/install.sh
 }
 
-build() {
+configure() {
     autotools_configure \
         --enable-multibyte \
         --with-curses
+}
 
-    make SHLIB_LIBS="-lncursesw" -j${parallelism}
+build() {
+    make SHLIB_LIBS="-lncursesw -ltinfow" -j${parallelism}
 }
 
 package() {
-    make SHLIB_LIBS="-lncursesw" install DESTDIR="${dest_dir}"
+    make install DESTDIR="${dest_dir}"
 
-    # libraries are created without soname... fix that
-    for lib in libhistory.so.8 libreadline.so.8; do
-        patchelf --set-soname $lib "${dest_dir}${prefix}/lib/$lib"
-    done
+    ln -s libreadline.so.8.2 "${dest_dir}${prefix}"/lib/libreadline.so.8
+    ln -s libhistory.so.8.2 "${dest_dir}${prefix}"/lib/libhistory.so.8
 
     post_package_strip
 }

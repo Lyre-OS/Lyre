@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=xf86-input-mouse
 version=1.9.5
 revision=1
@@ -6,15 +8,17 @@ tarball_blake2b="67f4de10424d640913fcafc2292f342a1e993d33e4ecc3c152e818953e19dea
 source_hostdeps="autoconf automake libtool pkg-config"
 source_deps="xorg-util-macros"
 hostdeps="gcc autoconf automake libtool pkg-config"
-deps="core-libs xorg-server xorg-util-macros libx11"
+deps="core-libs xorg-server xorg-util-macros"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

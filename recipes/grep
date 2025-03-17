@@ -1,3 +1,5 @@
+#! /bin/sh
+
 name=grep
 version=3.11
 revision=1
@@ -8,16 +10,18 @@ imagedeps="gperf"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs pcre2"
 
-regenerate() {
+prepare() {
     autotools_recursive_regen
 }
 
-build() {
+configure() {
     cp -rp "${source_dir}"/. ./
 
         configure_script_path=./configure \
     autotools_configure
+}
 
+build() {
     make -j${parallelism}
 }
 

@@ -5,9 +5,7 @@ all:
 	rm -f lyre.iso
 	$(MAKE) lyre.iso
 
-lyre.iso: jinx kernel
-	rm -f builds/kernel.built builds/kernel.packaged
-	$(MAKE) distro-base
+lyre.iso: jinx
 	./build-support/makeiso.sh
 
 kernel:
@@ -18,16 +16,8 @@ debug:
 	JINX_CONFIG_FILE=jinx-config-debug $(MAKE) all
 
 jinx:
-	curl -Lo jinx https://github.com/mintsuki/jinx/raw/802082d0389d0b73afed5f52875a204e9134a3fe/jinx
+	curl -Lo jinx https://github.com/mintsuki/jinx/raw/7a101a39eb061713f9c50ceafa1d713f35f17a3b/jinx
 	chmod +x jinx
-
-.PHONY: distro-full
-distro-full: jinx kernel
-	./jinx build-all
-
-.PHONY: distro-base
-distro-base: jinx kernel
-	./jinx build base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata xz zlib zstd
 
 .PHONY: run-kvm
 run-kvm: lyre.iso
@@ -37,37 +27,32 @@ run-kvm: lyre.iso
 run-hvf: lyre.iso
 	qemu-system-x86_64 -accel hvf -cpu host $(QEMUFLAGS)
 
-ovmf:
+ovmf/ovmf-code-x86_64.fd:
 	mkdir -p ovmf
-	cd ovmf && curl -o OVMF.fd https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd
+	curl -Lo $@ https://github.com/osdev0/edk2-ovmf-nightly/releases/latest/download/ovmf-code-x86_64.fd
+
+ovmf/ovmf-vars-x86_64.fd:
+	mkdir -p ovmf
+	curl -Lo $@ https://github.com/osdev0/edk2-ovmf-nightly/releases/latest/download/ovmf-vars-x86_64.fd
 
 .PHONY: run-uefi
-run-uefi: lyre.iso ovmf
-	qemu-system-x86_64 -enable-kvm -cpu host $(QEMUFLAGS) -bios ovmf/OVMF.fd
+run-uefi: lyre.iso ovmf/ovmf-code-x86_64.fd ovmf/ovmf-vars-x86_64.fd
+	qemu-system-x86_64 \
+		-enable-kvm \
+		-cpu host \
+		-drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-drive if=pflash,unit=1,format=raw,file=ovmf/ovmf-vars-x86_64.fd \
+		$(QEMUFLAGS)
 
 .PHONY: run
 run: lyre.iso
 	qemu-system-x86_64 $(QEMUFLAGS)
 
-.PHONY: kernel-clean
-kernel-clean:
-	rm -rf builds/kernel* pkgs/kernel*
-
-.PHONY: init-clean
-init-clean:
-	rm -rf builds/init* pkgs/init*
-
-.PHONY: base-files-clean
-base-files-clean:
-	rm -rf builds/base-files* pkgs/base-files*
-
 .PHONY: clean
-clean: kernel-clean init-clean base-files-clean
+clean:
 	rm -rf iso_root sysroot lyre.iso initramfs.tar
 
 .PHONY: distclean
-distclean: jinx
-	./jinx clean
-	rm -rf kernel iso_root sysroot lyre.iso initramfs.tar jinx ovmf
-	chmod -R 777 .jinx-cache
-	rm -rf .jinx-cache
+distclean: clean
+	make -C kernel distclean
+	rm -rf .jinx-cache jinx builds host-builds host-pkgs pkgs sources ovmf

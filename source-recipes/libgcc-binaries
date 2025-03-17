@@ -1,4 +1,6 @@
+#! /bin/sh
+
 name=libgcc-binaries
-version=7b5ec47da1f47c2965229c2739f4f141d17434f4
-tarball_url="https://github.com/mintsuki/libgcc-binaries/archive/${version}.tar.gz"
-tarball_blake2b="153b7ddaaae49bf0a48271099e76839255e8b533f5c216c22aff0c20c36209a64b70eb20eefe5a38ae47aaa64ce9664e5a4b3379f7462e34b6ed08c8bd5e7c21"
+version=6097e89af23cc4eec9f31a5a089f93c35e63edef
+git_url="https://github.com/osdev0/libgcc-binaries.git"
+commit=${version}
