@@ -305,16 +305,18 @@ index 0000000..1d4cd70
 +cpu = 'x86_64'
 +endian = 'little'
 diff --git mlibc-clean/meson.build mlibc-workdir/meson.build
-index a460a6d..bfbcc02 100644
+index a460a6d..56a8e98 100644
 --- mlibc-clean/meson.build
 +++ mlibc-workdir/meson.build
-@@ -248,6 +248,10 @@ elif host_machine.system() == 'vinix'
+@@ -248,6 +248,12 @@ elif host_machine.system() == 'vinix'
  	rtld_include_dirs += include_directories('sysdeps/vinix/include')
  	libc_include_dirs += include_directories('sysdeps/vinix/include')
  	subdir('sysdeps/vinix')
 +elif host_machine.system() == 'lyre'
 +	rtld_include_dirs += include_directories('sysdeps/lyre/include')
 +	libc_include_dirs += include_directories('sysdeps/lyre/include')
++	internal_conf.set10('MLIBC_MAP_DSO_SEGMENTS', true)
++	internal_conf.set10('MLIBC_MMAP_ALLOCATE_DSO', true)
 +	subdir('sysdeps/lyre')
  elif host_machine.system() == 'lemon'
  	rtld_include_dirs += include_directories('sysdeps/lemon/include')
@@ -437,10 +439,10 @@ index 0000000..f58dfc8
 +
 diff --git mlibc-workdir/sysdeps/lyre/generic/generic.cpp mlibc-workdir/sysdeps/lyre/generic/generic.cpp
 new file mode 100644
-index 0000000..0b53f66
+index 0000000..049d945
 --- /dev/null
 +++ mlibc-workdir/sysdeps/lyre/generic/generic.cpp
-@@ -0,0 +1,856 @@
+@@ -0,0 +1,860 @@
 +#include <bits/ensure.h>
 +#include <mlibc/allocator.hpp>
 +#include <mlibc/debug.hpp>
@@ -1225,6 +1227,10 @@ index 0000000..0b53f66
 +			goto again;
 +		}
 +		return ret.errno;
++	}
++	if (ret_value == 0) {
++		*ret_pid = 0;
++		return 0;
 +	}
 +	*ret_pid = ret_value;
 +	return 0;
