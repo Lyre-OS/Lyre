@@ -1,12 +1,12 @@
 #! /bin/sh
 
 name=limine
-version=9.2.0
+version=10.8.2
 revision=1
-tarball_url="https://github.com/limine-bootloader/limine/releases/download/v${version}/limine-${version}.tar.gz"
-tarball_blake2b="1748413935ef4f5ecad0f7e68aad832a616b4d23e0e6b4d8f65de6bf363aa00b28d63b6c7042bb0b967904b95d6af39ed22039756a3fa549f3f176f87674d7b0"
+tarball_url="https://codeberg.org/Limine/Limine/releases/download/v${version}/limine-${version}.tar.gz"
+tarball_blake2b="6ebd4461e737350414ea8bce3ed49264e510dd2fdba65ff81057f172eefbd16321adf24405b33bd76feb59a1569447244e1b6f1ae9a8ee186616f6dc7f3bde82"
 source_hostdeps="autoconf automake libtool pkg-config"
-imagedeps="mtools nasm"
+imagedeps="mtools nasm llvm lld clang"
 hostdeps="gcc autoconf automake libtool pkg-config"
 deps="core-libs"
 
@@ -15,19 +15,8 @@ prepare() {
 }
 
 configure() {
-    if [ "$ARCHITECTURE" = "x86_64" ]; then
-        X86_FLAGS="--enable-bios \
-                   --enable-bios-cd \
-                   --enable-bios-pxe \
-                   --enable-uefi-ia32 \
-        "
-    fi
-
     autotools_configure \
-        $X86_FLAGS \
-        --enable-uefi-$ARCHITECTURE \
-        --enable-uefi-cd \
-        TOOLCHAIN_FOR_TARGET=${OS_TRIPLET}
+        --enable-all
 }
 
 build() {
